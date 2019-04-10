@@ -1,0 +1,520 @@
+/*
+ *
+ * Copyright (c) 1999-2016 NetDimensions Ltd.
+ *
+ * All rights reserved.
+ *
+ * This software is the confidential and proprietary information of
+ * NetDimensions Ltd. ("Confidential Information").  You shall not
+ * disclose such Confidential Information and shall use it only in
+ * accordance with the terms of the license agreement you entered into
+ * with NetDimensions.
+ */
+
+/* JS namespace for package "com.netdimen.view.appraisal" */
+
+var appraisal = {};
+
+appraisal.manager = {};
+appraisal.manager.statusCategory = {};
+appraisal.manager.templates = {};
+
+appraisal.template = {};
+appraisal.template.general = {};
+appraisal.template.editor = {};
+appraisal.template.rating = {};
+appraisal.template.workflow = {};
+appraisal.template.structure = {};
+appraisal.template.targetAudience = {};
+appraisal.template.ratingScale = {};
+appraisal.template.structure.section = {};
+appraisal.template.structure.section.ratingsummary = {};
+appraisal.template.structure.section.pastachievement = {};
+
+appraisal.history = {};
+appraisal.mail = {};
+appraisal.search = {};
+
+appraisal.appraisalActionForm = {};
+appraisal.userappraisalautosave = {};
+appraisal.pastachievementssectionuser = {};
+
+/*----------------------------------------------*/
+var comp = {};
+
+comp.models = {};
+comp.models.browser = {};
+comp.models.compeditor = {};
+comp.models.compeditor.userReview={};
+
+comp.jobprofile = {};
+comp.jobprofile.browser = {};
+
+comp.center = {};
+comp.center.jobprofile = {};
+comp.center.cert = {};
+
+comp.dictionary = {};
+comp.dictionary.browser = {};
+
+comp.manager = {};
+comp.manager.proficiencyLevels = {};
+
+comp.search = {};
+comp.selector = {};
+
+
+/*----------------------------------------------*/
+var catalog = {};
+catalog.importer = {};
+catalog.importer.cp = {};
+catalog.importer.importcourse = {};
+catalog.importer.selectlanguage = {};
+catalog.importer.revision = {};
+catalog.importer.batch = {};
+catalog.assessment = {};
+catalog.moduleAttrCategories = {};
+catalog.optpay = {};
+catalog.webCatalogs = {};
+catalog.task = {};
+catalog.testAssign = {};
+catalog.editor = {};
+catalog.structureMaintenance = {};
+catalog.structuredcatalog = {};
+catalog.config = {};
+catalog.config.transcriptStatus = {};
+catalog.config.transcriptStatus.editor = {};
+catalog.autoEnroll = {};
+catalog.gtt = {};
+catalog.gtt.auth = {};
+catalog.gtt.editor = {};
+catalog.autoEnroll.editor = {};
+catalog.autoEnroll.listing = {};
+catalog.indicatedInterest = {};
+catalog.participants = {};
+catalog.geographicRegions = {};
+catalog.reference = {};
+catalog.revisions = {};
+catalog.groupEnroll = {};
+catalog.sessionEnrollmentUpdate = {};
+catalog.kc = {};
+catalog.checklist = {};
+catalog.checklist.template = {};
+catalog.checklist.template.editor = {};
+catalog.checklist.item={};
+catalog.associatedprogram = {};
+catalog.associatedprogram.module = {};
+catalog.equivalency = {};
+catalog.esignature = {};
+catalog.learningmodule = {};
+catalog.learningmodule.suggestion = {};
+catalog.learningobject = {};
+catalog.learningobject.create = {};
+
+catalog.trainingResourceBrowser = {};
+catalog.classResourceAttr = {};
+catalog.prerequisite = {};
+catalog.prerequisite.edit = {};
+catalog.enrollmentRestriction={};
+catalog.searchFilter={};
+catalog.demounit={};
+
+catalog.deadlinecolumn = {};
+catalog.cloneSession = {};
+catalog.enrollmentcolumn = {};
+
+catalog.publiccatalogtx = {};
+catalog.submodTranDeadline = {};
+catalog.trainingResourceBooking = {};
+
+/*----------------------------------------------*/
+var manager = {};
+manager.competencydrilldown = {};
+manager.search = {};
+manager.userreview = {};
+manager.courseware = {};
+manager.virtualClassroomAccount = {};
+manager.chatroom = {};
+manager.payplans = {};
+
+manager.usergroups = {};
+manager.userRole = {};
+manager.LogicalDomains = {};
+manager.loader = {};
+manager.ExchangeServer = {};
+
+manager.quickreview = {};
+manager.enrollmentWizard = {};
+manager.reviewEnrollment={};
+manager.supervisorAssessment = {};
+manager.approvaltasks = {};
+manager.userapproval = {};
+
+manager.demoUnitBrowser = {};
+manager.demoUnitEdit = {};
+/*----------------------------------------------*/
+var goal = {};
+goal.organization = {};
+goal.personal = {};
+goal.hierarchy = {};
+goal.individual = {};
+goal.development = {};
+goal.utils = {};
+goal.template = {};
+goal.templateLoader = {};
+
+/*----------------------------------------------*/
+var tms = {};
+tms.compassessment = {};
+tms.assessmenttemplates = {};
+tms.activeassessments = {};
+
+/*----------------------------------------------*/
+/* for universal search & other common search functions */
+var search = {};
+search.universal = {};
+var olsaTypeSearch = {};
+
+/*----------------------------------------------*/
+var user = {};
+user.search = {};
+user.profile = {};
+user.profile.profileSummary = {};
+user.profile.resume = {};
+
+user.selector = {};
+user.selector.competencyCriteria = {};
+user.selector.paster = {};
+user.attribute = {};
+user.attribute.value = {};
+
+user.organization = {};
+user.organizationMaintenance = {};
+
+user.selfregistration = {};
+user.create = {};
+
+user.editor = {};
+user.editor.searchUser = {};
+
+/*----------------------------------------------*/
+var news = {};
+news.search = {};
+news.listnews = {};
+news.editor = {};
+
+/*----------------------------------------------*/
+var personal = {};
+personal.preference = {};
+
+/*----------------------------------------------*/
+/* for common function such back button*/
+var common = {};
+common.browserView= {};
+common.columnPresets = {};
+
+/*----------------------------------------------*/
+var transcript = {};
+transcript.listTran = {};
+transcript.transcriptDetails = {};
+transcript.changeCompletionDate = {};
+transcript.extTrainingHistory = {};
+transcript.extTrainingHistory.edit = {};
+transcript.programProgressTracker = {}
+
+/*----------------------------------------------*/
+var system = {};
+system.links = {};
+system.access = {};
+system.listLayouts = {};
+system.termsOfUse = {};
+system.termsOfUseSummary = {};
+system.termsOfUseAcceptance = {};
+system.config = {};
+system.homepage = {};
+system.background = {};
+system.executionStats = {};
+system.backgroundtaskconsole = {};
+system.loginreminder = {};
+system.runTasks = {};
+system.htmlWidgets = {};
+
+/*----------------------------------------------*/
+var token = {};
+
+/*----------------------------------------------*/
+var careerdevelopment = {};
+careerdevelopment.trainingplan = {};
+careerdevelopment.trainingplan.edit = {};
+
+/*----------------------------------------------*/
+var forum = {};
+forum.editor = {};
+forum.category = {};
+forum.category.browser = {};
+forum.category.editor = {};
+
+/*----------------------------------------------*/
+var course = {};
+course.enrollmentrequests = {};
+course.enrollmentApproval = {};
+course.launchAttempt = {};
+course.launchESignature = {};
+course.homeworkFile = {};
+course.courseInstance = {};
+course.commons = {};
+course.commons.openedWin = {};
+course.commons.genericFrameset = {};
+course.activity = {};
+course.bundleSwitch = {};
+course.editsessioncourse = {};
+course.resourceBooking = {};
+course.moduleTitleActionsLink = {};
+course.enrollmentConfirm = {};
+
+/*----------------------------------------------*/
+var review = {};
+review.cdc = {};
+review.report = {};
+review.grading = {};
+
+/*----------------------------------------------*/
+var kc = {};
+kc.overview = {};
+kc.listContacts = {};
+kc.peerComments = {};
+kc.listNews = {};
+kc.assessments = {};
+
+/*----------------------------------------------*/
+var calendar = {};
+calendar.SessionCal = {};
+calendar.personal = {};
+calendar.classresource = {};
+calendar.IntegratedUserCalendar = {};
+calendar.integratedInstructorCalendar = {};
+calendar.instructorCalendar = {};
+calendar.facilityCalendar = {};
+calendar.abstractCalendar = {};
+catalog.facilityCalendarBooking = {};
+calendar.resource = {};
+calendar.trainingResourceCalendar = {};
+calendar.eventCreateSteps = {};
+/*----------------------------------------------*/
+var exam = {};
+exam.autoExemptPolicy = {};
+exam.examWizard = {};
+exam.examListing = {};
+exam.moduleAssign = {};
+exam.examSchedule = {};
+exam.editsect = {};
+exam.editorView = {};
+exam.showResult = {};
+exam.showExamSummary = {};
+exam.resume = {};
+
+/*----------------------------------------------*/
+var netd_screen = {};
+
+/*----------------------------------------------*/
+var report = {};
+report.auditTableColumns = {};
+report.batchReport = {};
+report.scheduleReport = {};
+report.chart = {};
+
+/*----------------------------------------------*/
+var config = {};
+config.category = {};
+config.attribute = {};
+
+/*----------------------------------------------*/
+var task = {};
+task.reminder = {};
+
+/*----------------------------------------------*/
+var info = {};
+
+/*----------------------------------------------*/
+var selectors = {};
+selectors.organization = {};
+selectors.organization.filter = {};
+
+/*----------------------------------------------*/
+var gototraining = {};
+gototraining.auth = {};
+
+/*----------------------------------------------*/
+var grantattempts = {};
+grantattempts.additional = {};
+
+/*----------------------------------------------*/
+var instructor = {};
+instructor.teachreview = {};
+
+var jobprofile = {};
+jobprofile.search = {};
+
+var certification = {};
+certification.editor = {};
+certification.browser = {};
+certification.review = {};
+certification.selfaward = {};
+
+var logicaldomain = {};
+logicaldomain.edit = {};
+
+var analytics = {};
+analytics.org = {};
+analytics.org.setup = {};
+analytics.org.edit = {};
+analytics.role = {};
+analytics.role.edit = {};
+analytics.org.assoc = {};
+analytics.org.assoc.edit = {};
+
+var widgets = {};
+widgets.proficiencyLevels = {};
+widgets.catalogsearch = {};
+widgets.enrollmentTrainingProgress = {};
+widgets.tincanActivity = {};
+widgets.promotion = {};
+
+var dynatree = {};
+
+var fileuploader = {};
+
+var slate = {};
+
+var contentServer = {};
+
+var question = {};
+question.questionPoolProgressiveSelector = {};
+question.questionPoolEditor = {};
+question.questionPoolTree = {};
+question.questionListView = {};
+question.qtiPreview = {}
+
+var autoassign = {};
+
+var roleperm = {};
+roleperm.accesscontrol = {};
+
+var mobile = {};
+mobile.abstractMobileView = {};
+mobile.selectAssignmentView = {};
+mobile.taskApproval = {};
+mobile.courseInfo = {};
+
+/*----------------------------------------------*/
+var catalogviewer = {};
+catalogviewer.structuredCatalogContent = {};
+
+
+var fixedButtonSet = {};
+var emailTemplateForm = {};
+
+var emailtemplate = {};
+emailtemplate.browser = {};
+
+var facet = {};
+facet.search = {};
+
+/*----------------------------------------------*/
+var permission = {};
+permission.template = {};
+permission.template.editor = {};
+permission.template.browser = {};
+
+/*----------------------------------------------*/
+var learning = {};
+learning.path = {};
+learning.statement = {};
+
+/*----------------------------------------------*/
+var language = {};
+language.bundle = {}; 
+language.bundle.lo = {}; 
+language.bundle.editor = {};
+language.bundle.editor.lo = {};
+language.bundle.cert = {};
+language.bundle.editor.cert = {};
+language.bundle.editor.exam = {};
+language.bundle.revisions = {};
+language.bundle.editor.question = {};
+language.bundle.editor.competency = {};
+language.bundle.editor.htmlWidget = {};
+language.xliff = {};
+
+/*----------------------------------------------*/
+var systemLanguage = {};
+
+
+/*----------------------------------------------*/
+var facility ={};
+facility.search = {};
+facility.selector = {};
+
+/*----------------------------------------------*/
+var resource ={};
+resource.search = {};
+resource.selector = {};
+
+/*----------------------------------------------*/
+var evaluationSummary = {};
+
+/*----------------------------------------------*/
+var dynamic = {};
+dynamic.attribute = {};
+dynamic.attribute.listAttributes = {};
+dynamic.attribute.editAttribute = {};
+
+var progressstatus = {};
+progressstatus.deadline = {};
+
+var compliance = {};
+compliance.participant = {};
+
+var courseware = {};
+courseware.editorView = {};
+courseware.templateEditorView = {};
+
+/*----------------------------------------------*/
+var demounit = {};
+demounit.search = {};
+demounit.selector = {};
+demounit.delivery = {};
+
+var policyeditor = {};
+policyeditor.extInfoView = {};
+
+/*-------------------------------------------*/
+var holidayCalendar = {};
+holidayCalendar.editor = {};
+holidayCalendar.trainingcenter = {};
+
+/*-------------------------------------------*/
+var trainingcenters = {};
+trainingcenters.editor = {};
+trainingcenters.selector = {};
+
+/*----------------------------------------------*/
+/* for accessibility functions */
+var accessibility = {};
+
+/*----------------------------------------------*/
+var classresources = {};
+classresources.instructor = {};
+classresources.instructorCourse = {};
+classresources.facility = {};
+
+var holidayCalendarDetailBase = {};
+holidayCalendarDetailBase.editor = {};
+
+var holidayCalendarDetail = {};
+holidayCalendarDetail.editor = {};
+
+var registerCourseInterest = {};
+
+var dataloader = {};
+dataloader.preview = {};

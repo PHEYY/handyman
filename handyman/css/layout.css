@@ -1,0 +1,40 @@
+/* index.html */
+#page1 .col-1 {
+	width:660px;
+	margin-right:65px
+}
+#page1 .col-2 {
+	width:280px
+}
+#page1 .column-1 {
+	width:326px;
+	margin-right:21px
+}
+#page1 .column-2 {
+	width:326px
+}
+#page1 .indent {
+	padding:21px 0 20px
+}
+#page1 #content {
+	padding:10px 0 33px
+}
+#page1 .box .padding {
+	padding:18px 10px 0 30px
+}
+/* index-1.html */
+#page2 .col-1 {
+	width:660px;
+	margin-right:65px
+}
+#page2 .col-2 {
+	width:280px
+}
+#page2 .column-1 {
+	width:326px;
+	margin-right:21px
+}
+#page2 .column-2 {
+	width:326px
+}
+

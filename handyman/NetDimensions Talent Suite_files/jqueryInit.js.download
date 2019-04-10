@@ -1,0 +1,24 @@
+$.ajaxSetup({
+  	headers: {"X-Requested-With":"XMLHttpRequest"}
+  	, error : handleError
+}); 
+
+function handleError(xhr, e) {
+	if (xhr.status == 408) { // request timeout
+		window.location.reload(true);
+		return;
+	}
+	// other error
+	if (xhr.getResponseHeader("Ajax-Exception") == "true") {
+		alert(xhr.responseText);
+	} 
+}
+
+function selectorEscape(expression) {
+    return expression.replace(/[!"#$%&'()*+,.\/:;<=>?@\[\\\]^`{|}~]/g, '\\$&');
+}
+
+function setUnload(unload){ 
+    var thisAttr = (navigator.userAgent.indexOf("Chrome") == -1)? "onunload" : "onbeforeunload";
+    document.body.setAttribute(thisAttr, "\"" + unload + "\"");
+}

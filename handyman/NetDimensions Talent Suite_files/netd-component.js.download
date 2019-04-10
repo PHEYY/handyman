@@ -1,0 +1,3034 @@
+/*
+ *
+ * Copyright (c) 1999-2016 NetDimensions Ltd.
+ *
+ * All rights reserved.
+ *
+ * This software is the confidential and proprietary information of NetDimensions Ltd. ("Confidential Information"). You
+ * shall not disclose such Confidential Information and shall use it only in accordance with the terms of the license
+ * agreement you entered into with NetDimensions.
+ */
+
+if(netd &&  "component" in netd){
+	if(console && console.log){
+		console.log("js loaded more than once");
+	}
+	$(function(){
+		netd.component.initAll(document);
+	});
+}else{
+
+var netd = {};
+netd.component = {};
+
+netd.component.initComponentButtons = function (target) {
+	target = target || document;
+
+    var buttons = $(".netd-button", target);
+
+
+    var initButton = function (button) {
+
+        var $button=$(button);
+        if ($button.data("inited")) {
+            return true;
+        }
+        $button.data("inited", true);
+        var isDisabled = $button.hasClass('ui-button-disabled');
+
+        if (!$button.hasClass('button-ui-inited')) {
+            var showText = ($button.attr("showtext") === "true");
+            $button.button({
+                text: showText,
+                disabled: (isDisabled || $button.is(":disabled"))
+            });
+            $button.addClass('button-ui-inited');
+        }
+
+        if ($button.hasClass('icon-resize-full') && $button.hasClass('ui-widget')) {
+            $button.removeClass('ui-widget');
+        }
+
+        var btnIcons = {};
+        var icon = $button.attr("icon");
+        var hasIcons = false;
+        if (icon) {
+            btnIcons.primary = icon;
+            hasIcons = true;
+        }
+        var secondaryIcon = $button.attr("secondary-icon");
+        if (secondaryIcon) {
+            btnIcons.secondary = secondaryIcon;
+            hasIcons = true;
+        }
+
+        if (hasIcons) {
+            $button.button("option", "icons", btnIcons);
+        }
+
+        netd.component.initEventHandlers($button);
+
+    };
+
+    buttons.each(function() {
+        initButton(this);
+    })
+    netd.component.dropDownButton.initButtons(buttons.filter("[is-drop-down-button]"));
+};
+
+netd.component.button = (function(){
+
+	function getEle(ele){
+
+		if(typeof ele === "string"){
+			ele = $(ele);
+		}else if(!ele.jquery){
+			ele=$(ele);
+		}
+		return ele;
+	}
+
+	function publicEnable(ele){
+
+		$ele = getEle(ele);
+		$ele.removeAttr('disabled');
+		$ele.removeAttr('aria-disabled');
+		$ele.removeClass('ui-button-disabled ui-state-disabled');
+	}
+
+	function publicDisable(ele){
+
+		$ele = getEle(ele);
+		$ele.attr('disabled', 'disabled');
+		$ele.attr('aria-disabled', true);
+		$ele.addClass('ui-button-disabled ui-state-disabled');
+	}
+
+	return {
+		enable : publicEnable,
+		disable : publicDisable
+	}
+})();
+
+netd.component.initNetdChangeEvent = function(selector) {
+
+	var isChromeOnMac = ((navigator.userAgent.indexOf("Chrome") > -1) && (navigator.userAgent.indexOf("Macintosh") > -1));
+	
+	function onTrigger(e) {
+		var idx = this.selectedIndex;
+		if (e.type === 'focusin'){
+			$(this).data('orig-idx', idx);
+		} else if (e.type === 'focusout'){
+			var origIdx = $(this).data('orig-idx');
+			if (!(origIdx===undefined || origIdx===null) && (idx != origIdx)) {
+				this.selectedIndex = origIdx;
+			}
+			$(this).data('orig-idx', null);
+		} else if (e.keyCode === 13 || e.type === 'click' || (isChromeOnMac && e.type === 'change')){
+			if (idx != $(this).data('orig-idx')){
+				$(this).data('orig-idx', idx);
+				$(this).trigger('netdChange');
+			}
+		}
+	}
+
+	if(selector.jquery) {
+		var $ele = selector;
+		$ele.off('.netdchange');
+		$ele.on('focusin.netdchange focusout.netdchange click.netdchange keypress.netdchange change.netdchange', onTrigger);
+	} else {
+		$(document).off('.netdchange', selector);
+		$(document).on('focusin.netdchange focusout.netdchange click.netdchange keypress.netdchange change.netdchange', selector, onTrigger);
+	}
+}
+netd.component.onNetdFocusOut= function($container){
+	$container.uniqueId();
+	var namespace=".netdFocusOut"+$container[0].id;
+	return $.Deferred(function(defer){
+		// assert $container.jquery && $container.lenght==1
+		function check(e){
+			if($container.has(e.target).length){
+				return;
+			}
+			$(document).off(namespace);
+			defer.resolve(e);
+		}
+
+		function checkIEFocusin(e) {
+			if (!clicked) {
+				check(e);
+			}
+		}
+
+		function checkIEMousedown(e) {
+			clicked = true;
+			check(e);
+		}
+
+		function checkIEKeydown(e) {
+			clicked = false;
+		}
+
+		var clicked = false;
+		if (navigator.userAgent.indexOf("MSIE") !== -1 || navigator.userAgent.indexOf("Trident") !== -1) {
+			$(document).on("focusin"+namespace, checkIEFocusin);
+			$(document).on("mousedown"+namespace, checkIEMousedown);
+			$(document).on("keydown"+namespace, checkIEKeydown);
+		} else {
+			$(document).on("focusin"+namespace+" click"+namespace, check);
+		}
+	});
+}
+
+
+netd.component.initDropDownButton = function (button) {
+	netd.component.dropDownButton.initButtons($(button));
+}
+netd.component.dropDownButton=(function($){
+	"use strict";
+	function stickyOpen($container){
+		$container.addClass("active")
+				  .children(".netd-button")
+				  .attr("aria-expanded", true);
+		netd.component.onNetdFocusOut($container).then(function(e){
+			stickyClose($container);
+		});
+	}
+	function stickyClose($container){
+		$container.removeClass("active")
+				  .children(".netd-button")
+				  .attr("aria-expanded", false);
+	}
+	function runItemAction($button, e){
+		var methodName = $button.attr("item-action");
+		getFunctionByName(methodName, window).call($button, e);
+
+	}
+	function initOnce(){
+		$(document).on("click.netdDropDown", ".netd-drop-down-btn-list > .netd-drop-down-btn-item.default-binding[item-action]:not(.disabled)", function(e){
+			runItemAction($(this), e);
+			return false;
+		});
+		$(document).on("click.netdDropDown", ".netd-button[is-drop-down-button]", function(e){
+			var $container=$(this).closest('.netd-drop-down-btn-container');
+			if($container.hasClass("active")){
+				stickyClose($container);
+			}else{
+				stickyOpen($container);
+			}
+			return false;
+		});
+	}
+	function initButtons($buttons){
+		$buttons.not("[aria-label]").each(function(){
+			if (this.disabled) {
+				this.setAttribute('aria-label', BUNDLE['desc.show_no_available_actions']);
+			} else {
+				this.setAttribute('aria-label', BUNDLE['desc.show_available_actions']);
+			}
+		})
+		if($buttons.length == 0 || $(".overflow-table-wrapper").length == 0){
+			return;
+		}
+	}
+	function closeAll($context){
+		$context.find(".netd-drop-down-btn-container.active").each(function(){
+			stickyClose($(this));
+		});
+	}
+	return {
+		initOnce: initOnce,
+		initButtons: initButtons,
+		closeAll: closeAll,
+		runItemAction: runItemAction
+	}
+})($);
+
+netd.component.initComponentTables = function () {
+	$(".netd-table").each(function () {
+		if ($(this).hasClass("netd-alt-col-table")) {
+			$(this).alternateCols();
+		} else {
+			if ($(this).attr("netd-row-spanned")) {
+				$(this).alternateRows("netd-row-group");
+			} else {
+				$(this).alternateRows();
+			}
+		}
+	});
+
+};
+
+netd.component.initComponentCheckAllCheckBoxes = function () {
+
+	function doCallback(checkAll, methodName) {
+		if (methodName) {
+			var fn = getFunctionByName(methodName, window);
+			fn.apply($(checkAll));
+		}
+	}
+
+	$($(".netd-check-all").get().reverse()).each(function () {
+		var checkAll = $(this);
+
+		var checkboxGroupContainer = $(this).closest('table');
+		var checkboxGroupContainerMethodName = $(this).attr("checkbox-group-container");
+		if (checkboxGroupContainerMethodName) {
+			var fn = getFunctionByName(checkboxGroupContainerMethodName, window);
+			if (fn) {
+				checkboxGroupContainer = fn.apply($(this));
+			}
+		}
+
+		var checkboxes = null;
+		var checkboxSelector = ':input[name="' + checkAll.attr("group-name") + '"]:enabled, :input[name="' + checkAll.attr("group-name") + '"][readonly="readonly"]';
+		if (checkboxGroupContainer.length == 0) {
+			checkboxes = $(checkboxSelector);
+		} else {
+			checkboxes = $(checkboxSelector, checkboxGroupContainer);
+		}
+
+		checkAll.prop("disabled", ($(checkAll).is(":disabled") || checkboxes.length==0));
+
+		var onCheckMethodName = checkAll.attr("callback-method");
+		$(this).click(function (e) {
+			e.stopPropagation();
+			checkboxes.prop('checked', this.checked);
+			accessibility.updateScreenReaderAlert(this.checked ? BUNDLE['accessibility.selectedall'] : BUNDLE['accessibility.deselectedall']);
+			doCallback(this, onCheckMethodName);
+		});
+
+		checkboxes.click(function (e) {
+			e.stopPropagation();
+
+			var totals = 0;
+			var checked = 0;
+			checkboxes.each(function () {
+				if (this.checked) {
+					checked++;
+				}
+				totals++;
+			});
+
+			checkAll.prop('checked', totals == checked);
+
+			doCallback(checkAll, onCheckMethodName);
+		});
+
+		if (!checkAll.attr( "aria-label")) {
+			checkAll.attr( "aria-label", BUNDLE['desc.select_all_items']);
+		}
+	});
+};
+
+netd.component.initComponentCheckBoxes = function () {
+
+	$("table td.select_column").children(":checkbox:not(.netd-check-all):not([aria-label])").each(function(){
+		var checkbox = $(this);
+		checkbox.attr( "aria-label", BUNDLE['desc.select_item']);
+	});
+};
+
+netd.component.dropdown = (function($) {
+
+	function initOnce() {
+		netd.component.initNetdChangeEvent(".netd-dropdown");
+		$(document).on("netdChange.onchangemethod", ".netd-dropdown", function (e) {
+			var $dropdown=$(this);
+			var $selectedOption=$dropdown.find("option:selected").first();
+			var methodName = $selectedOption.attr("onchangemethod");
+			if (methodName) {
+				var fn = getFunctionByName(methodName, window);
+				fn();
+				$dropdown.data('orig-idx', null);
+				$dropdown.find("option:first").prop("selected", "selected");
+			}
+		});
+	}
+
+	function init() {
+		$('.netd-dropdown:not([aria-label])').each(function(){
+			var $dropdown = $(this);
+			$dropdown.attr("aria-label", BUNDLE['desc.please_select_one_item']);
+		});
+	}
+
+	return {
+		init: init,
+		initOnce: initOnce
+	}
+
+})($);
+
+var KEY = {
+	BACKSPACE: 8,
+	ENTER: 13,
+	LEFT: 37,
+	UP: 38,
+	RIGHT: 39,
+	DOWN: 40,
+	DELETE: 46,
+	NUMPAD_ENTER: 108
+};
+
+
+netd.component.isUserSelectorEnabled = function (userSelector) {
+	return $(userSelector).data("enabled");
+};
+
+netd.component.enableUserSelector = function (userSelector) {
+	$(userSelector).data("enabled", true);
+	var tokenInput = $(userSelector).find(".netd-token-input");
+	tokenInput.tokenInput("toggleDisabled", false);
+	$(userSelector).removeClass("disabled-netd-user-selector").find('.token-input-delete-token-facebook').show();
+};
+
+netd.component.disableUserSelector = function (userSelector) {
+	$(userSelector).data("enabled", false);
+	var tokenInput = $(userSelector).find(".netd-token-input");
+	tokenInput.tokenInput("toggleDisabled", true);
+	$(userSelector).addClass("disabled-netd-user-selector").find('.token-input-delete-token-facebook').hide();
+
+};
+
+netd.component.initComponentUserSelector = function (target) {
+	target = target || document;
+	$('.netd-user-selector', target).each(function () {
+		var thisUserSelector = this;
+		var advSearchTx = $(thisUserSelector).attr('user-selector-tx');
+		var isComponentPermissionCriteriaSelector = $(thisUserSelector).attr('is-permission-criteria-selector') === 'true';
+		var title = $(thisUserSelector).attr('data-title');
+		var userSelectorIdVal = $(thisUserSelector).attr('psoid');
+		var formName = $(thisUserSelector).attr('form-name');
+		var keyName = $(thisUserSelector).attr('key-name');
+		var displayName = $(thisUserSelector).attr('display-name');
+		var extendedName = $(thisUserSelector).attr('extended-name');
+		var allowMulti = $(thisUserSelector).attr('allow-multiple') == 'Y';
+		var formNotUsed = $(thisUserSelector).attr('form-not-used') == 'Y';
+		var closeBtnName = $(thisUserSelector).attr('close-button');
+		var saveBtnName = $(thisUserSelector).attr('save-button');
+		var numTokenLimit = $(thisUserSelector).find('.netd-token-input').attr('maxTokens');
+		var hintTextName = $(thisUserSelector).attr('hint-text');
+		var searchTextName = $(thisUserSelector).attr("searching-text");
+		var noResultsTextName = $(thisUserSelector).attr('no-results-text');
+		var expandModeTextName = $(thisUserSelector).attr('expand-mode-text');
+		var collapseModeTextName = $(thisUserSelector).attr('collapse-mode-text');
+		var isMultipleType = $(thisUserSelector).attr('is-multiple-type');
+		var fnAdvancedAction = getFunctionByName(getComponentAttribute($(thisUserSelector), 'func-advanced-click'), window);
+		var userSelectorButtonId = keyName + "-button-id";
+
+		var isEnabled = true;
+		if (!$(thisUserSelector).hasClass('user-selector-ui-inited')) {
+            if ($(".netd-token-input:visible:disabled", $(thisUserSelector)).length > 0) {
+                isEnabled = false;
+            }
+
+            $.each($(".netd-token-input:visible", $(thisUserSelector)), function(){
+                var zIndex = 899;
+                if ($(this).closest('.ui-dialog').length > 0) {
+                    zIndex = 99999;
+                }
+                $(this).tokenInput(
+                netd.component.getTransactionUrlForUserSelector, {
+                    cacheManager: netd.component.userSelector.dummyCacheManager,
+                    theme: "facebook",
+                    method: "GET",
+                    queryParam: "KEYW",
+                    tokenLimit: numTokenLimit,
+                    hintText: "",
+                    noResultsText: noResultsTextName,
+                    searchingText: searchTextName,
+                    expandModeTextName: expandModeTextName,
+                    collapseModeTextName: collapseModeTextName,
+                    zindex: zIndex,
+                    needIcon: typeof isMultipleType == "undefined" ? false : isMultipleType,
+                    onAdd: function (item) {
+                        var tokenInput = $(this).closest(".netd-token-input");
+                        var thisUserSelector = $(this).closest('.netd-user-selector');
+                        var hiddenInput = tokenInput.attr("hiddenInput");
+                        var optionSelect = tokenInput.attr("selectId");
+                        var allowMulti = thisUserSelector.attr('allow-multiple') == 'Y';
+                        var noUsersSelectedTextName = thisUserSelector.attr('num-users-selected-text');
+                        var ul = thisUserSelector.find(".token-input-list-facebook");
+                        var tokenList = ul.children(".token-input-token-facebook");
+                        var i = tokenList.length - 1;
+                        var $optionSelect = $('#' + optionSelect);
+                        var optionList = $('option', $optionSelect);
+
+                        // keep consistency among token list, option list, hidden input and no-of-selected
+                        netd.component.addUserToUserSelector(item, optionSelect, hiddenInput);
+
+                        // move the option to a position consistent to as displayed in tokeninput
+                        if (!tokenInput.hasClass('user-selector-under-multiple-addition')) {
+                            for (i = 0; i < tokenList.length; i++) {
+                                if (tokenList.eq(i).find("p").attr("id") != optionList.eq(i).attr("value")) {
+                                    if (i != tokenList.length - 1) {
+                                        $('option[value="' + item.id + '"]', $optionSelect).insertBefore(optionList.eq(i));
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                        tokenList.eq(i).find("p").attr("id", item.id);
+
+                        // update the label for number of selected users
+                        if (allowMulti) {
+                            netd.component.updateNoOfSelectedUsers(thisUserSelector, noUsersSelectedTextName, $('option', $optionSelect).length);
+                        }
+
+                        // for IE: avoid user selector from losing focus
+                        if (!tokenInput.hasClass('user-selector-under-multiple-addition')) {
+                            var searchInput = $(this).closest(".netd-token-input").attr("id");
+                            netd.component.focusUserSelector(searchInput, userSelectorButtonId);
+                        }
+
+                        var simplePermissionSelector = thisUserSelector.closest('.netd-perm-criteria-box');
+                        if (simplePermissionSelector.length > 0) {
+                            netd.component.updateSimplePermissionSelectorHiddenField(simplePermissionSelector, $('option', $optionSelect));
+                        }
+                    },
+                    onDelete: function (item) {
+                        var tokenInput = $(this).closest(".netd-token-input");
+                        var thisUserSelector = $(this).closest('.netd-user-selector');
+                        var hiddenInput = tokenInput.attr("hiddenInput");
+                        var optionSelect = tokenInput.attr("selectId");
+                        var allowMulti = thisUserSelector.attr('allow-multiple') == 'Y';
+                        var noUsersSelectedTextName = thisUserSelector.attr('num-users-selected-text');
+
+                        if (item) { // This checking is important to avoid JS error when pressing the DOWN and BACKSPACE keys
+                            netd.component.removeUserFromUserSelector(item.id, optionSelect, hiddenInput);
+                        }
+
+                        if (allowMulti) {
+                            netd.component.updateNoOfSelectedUsers(thisUserSelector, noUsersSelectedTextName, $('option', $('#' + optionSelect)).length);
+                        }
+
+                        // avoid input box to be placed in the middle of token list
+                        var searchInput = $(this).closest(".netd-token-input").attr("id");
+                        netd.component.focusUserSelector(searchInput, userSelectorButtonId);
+
+                        var closestul = thisUserSelector.find(".token-input-list-facebook");
+                        var closestOldLi = closestul.children(".token-input-input-token-facebook");
+                        var listSize = closestul.children(".token-input-token-facebook").length;
+                        if (closestOldLi.index() == listSize && closestul.children(".clear-both").length != 0) {
+                            var inputbox = closestul.find('input[id^="token-input-"]');
+                            inputbox.appendTo(closestOldLi);
+                            closestul.children(".clear-both").remove();
+                        }
+
+                        var simplePermissionSelector = thisUserSelector.closest('.netd-perm-criteria-box');
+                        if (simplePermissionSelector.length > 0) {
+                            netd.component.updateSimplePermissionSelectorHiddenField(simplePermissionSelector, $('option', $('#' + optionSelect)));
+                        }
+                    },
+                    onResult: function (results) {
+                        return netd.component.filterSelectedAndLimitResults(results, $(this));
+                    },
+                    onCachedResult: function (results) {
+                        return netd.component.filterSelectedAndLimitResults(results, $(this));
+                    }
+                });
+        });
+			if (!isEnabled) {
+				netd.component.disableUserSelector(thisUserSelector);
+			}
+			else {
+				$(thisUserSelector).data("enabled", true);
+			}
+
+			if ($(':visible', $(thisUserSelector)).length > 0) { // This checking is important for user selectors placed in an overlay
+				var tokenInput = $(thisUserSelector).find('input[id^="token-input-"]');
+
+				// add placeholder to user selector
+				tokenInput.attr("placeholder", hintTextName);
+				$('.token-input-input-token-facebook').children().each(function () {
+					$(this).width($(".netd-user-selector-span").width() + 10);
+				});
+
+				tokenInput.focus(function () {
+					var win = $(thisUserSelector).data("advwin");
+					var isInPopup = $(thisUserSelector).attr("is-in-popup");
+					if (win && !win.closed) {
+						tokenInput.blur();
+						win.focus();
+						return;
+					}
+					else {
+						if ($(thisUserSelector).data("enabled")) {
+							if (win && isInPopup != "true") {
+								var ti = $(thisUserSelector).find(".netd-token-input");
+								/**
+								 * Toggle disabled will trigger deselect.
+								 *  So only do it when we have win before
+								 */
+								ti.tokenInput("toggleDisabled", false);
+								$(thisUserSelector).data("advwin", undefined);
+							}
+						}
+						else {
+							return;
+						}
+					}
+
+					if (tokenInput.val() == tokenInput.attr('plazeholder')) {
+						tokenInput.val('');
+						tokenInput.css("color", "black");
+					}
+				});
+
+				tokenInput.blur(function () {
+					if (!$(thisUserSelector).data("enabled")) {
+						return;
+					}
+					if (tokenInput.val() == '' || tokenInput.val() == tokenInput.attr('plazeholder')) {
+						tokenInput.val(tokenInput.attr('plazeholder'));
+						tokenInput.css("color", "#aaa");
+					}
+				});
+
+				netd.component.populateTokenInput($(thisUserSelector).find(".netd-token-input"));
+				$(thisUserSelector).addClass('user-selector-ui-inited');
+			}
+		}
+
+		$('.user-selector-button', $(thisUserSelector)).attr("id", userSelectorButtonId);
+		if (fnAdvancedAction == null || fnAdvancedAction == netd.component.openAdvancedUserSelector || fnAdvancedAction == netd.component.openAdvancedPermissionSelector) {
+			$('.user-selector-button', $(thisUserSelector)).unbind('click');
+			$('.user-selector-button', $(thisUserSelector)).click(function () {
+				if (!$(thisUserSelector).data("enabled")) {
+					return;
+				}
+				var tokenInput = $(thisUserSelector).find(".netd-token-input");
+				if (!isComponentPermissionCriteriaSelector) {
+					var dialogContainer = $('<div/>')
+						.addClass('user-selector-content');
+					var winWidth = $(window).width();
+					var myStr = 'top';
+					var atStr = 'top';
+					var dialogWidth = 760;
+					if(winWidth <= dialogWidth){
+						myStr = 'left top';
+						atStr = 'left top';
+					}
+					$(dialogContainer).dialog({
+						title: title,
+						width: dialogWidth,
+						height: "auto",
+						dialogClass: "user-selector-dialog",
+						position: {
+							my: myStr,
+							at: atStr,
+							of: $(window),
+							collision: 'none'
+						},
+						autoOpen: false,
+						modal: true,
+						closeOnEscape: false,
+						buttons: {
+							Save: {
+								text: saveBtnName,
+								id: "user-selector-save-button",
+								click: function () {
+									// 1. clear the token list
+									//netd.component.clearTokenInput($(thisUserSelector));
+									var optionSelect = tokenInput.attr("selectId");
+									tokenInput.removeClass("expand-mode");
+									netd.component.clearTokenInput($(thisUserSelector));
+									$('option', $('#' + optionSelect)).remove();
+									var hiddenInput = tokenInput.attr("hiddenInput");
+									var originalSelectedValue = $(thisUserSelector).find('input[name=' + hiddenInput + ']').val();
+									$(thisUserSelector).find('input[name=' + hiddenInput + ']').val('');
+									var noUsersSelectedTextName = $(thisUserSelector).attr('num-users-selected-text');
+									netd.component.updateNoOfSelectedUsers(thisUserSelector, noUsersSelectedTextName, 0);
+
+									// 2. prepare the option and hidden list
+									submitSingleField(formName, keyName, displayName, extendedName, formNotUsed, allowMulti, true);
+
+									// 3. prepare the token list
+									netd.component.convertSelectedUsersInIndividualUserSelector($(thisUserSelector), originalSelectedValue);
+									netd.component.focusUserSelector(tokenInput.attr("id"), userSelectorButtonId);
+									var inputBox = $(thisUserSelector).find('input[id^="token-input-"]');
+									inputBox.css("color", "black");
+									$(this).dialog("close");
+								}
+							},
+							Close: {
+								text: closeBtnName,
+								id: "user-selector-close-button",
+								click: function () {
+									$(this).dialog("close");
+								}
+							}
+						},
+						close: function () {
+							$(this).remove();
+						}
+					});
+					$.post(getTransactionUrl(advSearchTx),
+						{
+							TEMPSELECTEDVALUES: '',
+							NEW: 'Y',
+							UINIT: 'Y',
+							PSOID: userSelectorIdVal
+						}, function (data) {
+							$(dialogContainer).html($(data));
+							$(dialogContainer).dialog('open');
+						});
+				} else {
+
+					var win = $(thisUserSelector).data("advwin");
+					if (win && !win.closed) {
+						win.focus();
+						return;
+					}
+					win = fnAdvancedAction.apply(this, [this, advSearchTx, userSelectorIdVal]);
+					$(thisUserSelector).data("advwin", win);
+					win.focus();
+				}
+			});
+		}
+		
+		var simplePermissionSelector = $(thisUserSelector).closest('.netd-perm-criteria-box');
+		if (simplePermissionSelector.length > 0) {
+			netd.component.hideShowSimplePermissionSelector(simplePermissionSelector);
+		}
+
+		$(this).closest('form').find('input[type="reset"]').unbind('click.' + keyName);
+		$(this).closest('form').find('input[type="reset"]').bind('click.' + keyName, function () {
+			netd.component.clearTokenInput($(thisUserSelector));
+		});
+	});
+
+}
+netd.component.openAdvancedUserSelector = function (element, advSearchTx, userSelectorIdVal) {
+	return openWindow(getTransactionUrl(advSearchTx) + "?TEMPSELECTEDVALUES=&NEW=Y&UINIT=Y&PSOID=" + userSelectorIdVal, 'SO', '');
+};
+
+netd.component.openAdvancedPermissionSelector = function (element, advSearchTx, userSelectorIdVal) {
+	var criteriaBox = $(element).closest('.netd-perm-criteria-box');
+	var permissionCode = criteriaBox.find('#PERMISSIONCODE').val();
+	var excludedCriteria = ['SELUSERS_' + permissionCode];
+	var url = getTransactionUrl(advSearchTx) + "?";
+	criteriaBox.find('.netd-perm-criteria-selector-box > input[type=hidden]').each(function (index, item) {
+		if ($.inArray(item.name, excludedCriteria) >= 0) {
+			return true;
+		}
+		if (index > 0) {
+			url += '&';
+		}
+		var itemName = item.name;
+		if (itemName.indexOf('OPERATOR') == 0) {
+			itemName = 'OPERATOR';
+		}
+		if (itemName.indexOf('ORGATTR_') == 0 && item.getAttribute("data-object") != "") {
+			$(JSON.parse(item.getAttribute("data-object"))).each(function(){
+				var org_attr_id = this.id;
+				var org_attr_value = this.value;
+				url += '&OR=' + org_attr_id;
+				if (org_attr_value != undefined) {
+					url += '&' + org_attr_id + '=' + org_attr_value;
+				}
+			});
+		}else {
+			url += itemName + '=' + item.value;
+		}
+	});
+	var advancedSelector = NewWindowForPermissions(url, 'PERMISSIONS_WINDOW');
+	return advancedSelector;
+};
+
+netd.component.isSimplePermissionCriteria = function (criteriaBox, permissionCode) {
+	var simplePermission = true;
+	var complexCriteria = ['SELECTEDUSERGROUPS_' + permissionCode,
+		'SELECTEDROLE_' + permissionCode,
+		'ORG_' + permissionCode,
+		'EXCLUDE_ORG_' + permissionCode,
+        'SELECTEDPT_' + permissionCode];
+	for (var i = 1; i <= 8; i++) {
+		complexCriteria.push('UA' + i + "_" + permissionCode);
+	}
+	criteriaBox.find('.netd-perm-criteria-selector-box > input[type=hidden]').each(function (index, item) {
+		if (item.name.indexOf('OPERATOR') >= 0 && item.value == 'AND') {
+			simplePermission = false;
+		}
+		if (item.name.indexOf('ORGATTR') >= 0 && (item.value.indexOf('EKP') > 0 || item.getAttribute("data-object").indexOf('EKP') > 0)) {
+			simplePermission = false;
+		}
+		if ($.inArray(item.name, complexCriteria) >= 0 && item.value) {
+			simplePermission = false;
+		}
+	});
+	return simplePermission;
+};
+
+netd.component.hideShowSimplePermissionSelector = function (criteriaBox) {
+	var permissionCode = criteriaBox.find('#PERMISSIONCODE').val();
+	var simplePermission = netd.component.isSimplePermissionCriteria(criteriaBox, permissionCode);
+	if (simplePermission) {
+		criteriaBox.find('.netd-perm-criteria-simple-selector-box').removeClass('display-none');
+		criteriaBox.find('.netd-perm-criteria-advanced-selector-box').addClass('display-none');
+	} else {
+		criteriaBox.find('.netd-perm-criteria-simple-selector-box').addClass('display-none');
+		criteriaBox.find('.netd-perm-criteria-advanced-selector-box').removeClass('display-none');
+	}
+	return simplePermission;
+};
+
+netd.component.updateSimplePermissionSelectorFromAdvanced = function (permissionCodeParam) {
+	$('.netd-perm-criteria-box').each(function () {
+		var criteriaBox = $(this);
+		var permissionCode = criteriaBox.find('#PERMISSIONCODE').val();
+
+		if (permissionCodeParam != permissionCode) {
+			return;
+		}
+
+		var simplePermission = netd.component.hideShowSimplePermissionSelector(criteriaBox, permissionCode);
+
+		// update user selector
+		netd.component.clearTokenInput(criteriaBox.find('.netd-user-selector'));
+		criteriaBox.find('.selected-user-ids').val('');
+		if (simplePermission) {
+			var selectedUserIds = criteriaBox.find('#selectedUSERS_' + permissionCode).val();
+			var selectedUserNames = criteriaBox.find('#SELUSERS_' + permissionCode).val();
+			var selectedTooltips = criteriaBox.find('#SELUSERS_' + permissionCode).attr("tooltip");
+			if (selectedUserIds) {
+				var userIds = selectedUserIds.split(',');
+				var userNames = selectedUserNames.split('\n');
+				var tooltips = selectedTooltips ? selectedTooltips.split('\n') : "";
+				var userSelector = criteriaBox.find('.netd-user-selector');
+				var tokenInput = userSelector.find('.netd-token-input');
+				for (var i = 0; i < userIds.length; i++) {
+					tokenInput.tokenInput("add", {id: userIds[i], name: userNames[i], tooltipContent: tooltips[i]});
+				}
+			}
+		}
+	});
+};
+
+netd.component.updateSimplePermissionSelectorHiddenField = function (userSelector, options) {
+	var simpleSelector = userSelector.closest('.netd-perm-criteria-box');
+	if (simpleSelector.length > 0) {
+		var userCriteria = simpleSelector.find('.netd-perm-criteria-selector-box > input[name^="selectedUSERS_"]');
+		var userNameCriteria = simpleSelector.find('.netd-perm-criteria-selector-box > input[name^="SELUSERS_"]');
+		var userIds = [];
+		var userNames = [];
+		options.each(function () {
+			userIds.push(this.value);
+			userNames.push(this.text);
+		});
+		userCriteria.val(userIds.join(','));
+		userNameCriteria.val(userNames.join('\n'));
+	}
+};
+
+netd.component.getTransactionUrlForUserSelector = function () {
+	var inputbox = $('input[id^="token-input-"]:focus');
+	var tokeninput = $(inputbox).closest(".netd-user-selector");
+	var userSelectorSearchTx = $(tokeninput).attr('search-tx');
+	var userSelectorIdVal = $(tokeninput).attr('psoid');
+	var userSelectorSearchTxAction = $(tokeninput).attr('search-tx-action');
+
+	var numberOfSelectedUsers = tokeninput.find('option').length;
+
+	var baseUrl = getTransactionUrl(userSelectorSearchTx);
+	var psoidQuery = "?PSOID=" + userSelectorIdVal;
+	var selectedUsersSizeQuery = "&SELECTEDUSERSNUMBER=" + numberOfSelectedUsers;
+
+	var txAction = "&ACTION=" + userSelectorSearchTxAction;
+
+	return baseUrl + psoidQuery + selectedUsersSizeQuery + txAction;
+};
+
+netd.component.userSelector = {
+	onChangeCallback: function (selectorContainer, selectId, changeDetails) {
+
+	},
+	beforeAddCallback: function (selectorContainer, selectId, options) {
+	},
+	addBeforeAddCallback: function (callback) {
+		var oldCallback = this.beforeAddCallback;
+		if (typeof oldCallback != 'function') {
+			this.beforeAddCallback = callback;
+		} else {
+			this.beforeAddCallback = function (selectorContainer, selectId, options) {
+				if (oldCallback) {
+					oldCallback(selectorContainer, selectId, options);
+				}
+				callback(selectorContainer, selectId, options);
+			};
+		}
+	},
+	addOnChangeCallback: function (callback) {
+		var oldCallback = this.onChangeCallback;
+		if (typeof oldCallback != 'function') {
+			this.onChangeCallback = callback;
+		} else {
+			this.onChangeCallback = function (selectorContainer, selectId, changeDetails) {
+				if (oldCallback) {
+					oldCallback(selectorContainer, selectId, changeDetails);
+				}
+				callback(selectorContainer, selectId, changeDetails);
+			};
+		}
+	},
+	dummyCacheManager: {
+		add: function () {
+
+		},
+		get: function () {
+
+		}
+	},
+    clear: function(selectorContainer) {
+        netd.component.clearTokenInput(selectorContainer);
+        selectorContainer.find('.selected-user-ids').val('');
+    }
+};
+
+
+netd.component.filterSelectedAndLimitResults = function (results, tokeninput) {
+	var tokenInput = tokeninput.closest(".netd-token-input");
+	var optionSelect = tokenInput.attr("selectId");
+	var selectedItems = $('option', $('#' + optionSelect));
+
+	// avoid selected user from being selected again
+	results = jQuery.grep(results, function (row) {
+		for (var i = 0; i < selectedItems.length; i++) {
+			if (selectedItems[i].value == row.id) {
+				return false;
+			}
+		}
+		return true;
+	});
+
+	// display a limited number of search results
+	var maxDropboxRowsDisplayed = tokeninput.closest(".netd-user-selector").attr('max-dropbox-rows-displayed');
+	results = jQuery.grep(results, function (row, index) {
+		return index < maxDropboxRowsDisplayed;
+	});
+
+	return results;
+};
+
+netd.component.convertSelectedUsersInIndividualUserSelector = function (userSelectorDiv, originalSelectedValue) {
+	var selectId = $('.hidden-user-select', $(userSelectorDiv)).attr('name');
+	var hiddenInput = $('.selected-user-ids', $(userSelectorDiv)).attr('name');
+	netd.component.convertUserSelectorFromSelect(selectId, hiddenInput, originalSelectedValue);
+};
+
+netd.component.populateTokenInput = function (curTokenInput) {
+	var hiddenInput = $(curTokenInput).attr("hiddenInput");
+	var optionSelect = $(curTokenInput).attr("selectId");
+	netd.component.convertUserSelectorFromSelect(optionSelect, hiddenInput);
+};
+
+netd.component.clearTokenInput = function (userSelector) {
+	// bring the user selector back to its original form for clear-up
+	var closestUl = userSelector.find(".token-input-list-facebook");
+	var closestOldLi = closestUl.find(".token-input-input-token-facebook");
+	var closestNewLi = userSelector.find(".token-input-list-facebook").children(".clear-both");
+
+	if (closestNewLi.length != 0) {
+		var closestInput = closestNewLi.find('input[id^="token-input-"]');
+		closestInput.appendTo(closestOldLi);
+		closestOldLi.appendTo(closestUl);
+		closestNewLi.remove();
+	}
+
+	var tokenInput = $(".netd-token-input", $(userSelector));
+	if ($(tokenInput).length == 0) {
+		return;
+	}
+	tokenInput.addClass('user-selector-under-clearing');
+
+	tokenInput.tokenInput("setBatchMode", true);
+	tokenInput.tokenInput("clear");
+	tokenInput.tokenInput("setBatchMode", false);
+
+	var noUsersSelectedTextName = $(userSelector).attr('num-users-selected-text');
+	var optionSelect = tokenInput.attr("selectId");
+	$('#' + optionSelect).empty();
+	netd.component.updateNoOfSelectedUsers($(userSelector), noUsersSelectedTextName, 0);
+
+	tokenInput.removeClass('user-selector-under-clearing');
+};
+
+netd.component.updateNoOfSelectedUsers = function (currentSelector, noUsersSelectedTextName, length) {
+	$(currentSelector).find(".netd-num-selected").html(noUsersSelectedTextName.replace("{0}", length));
+};
+
+netd.component.convertUserSelectorFromSelect = function (selectId, hiddenInput, originalSelectedValue) {
+	/*
+	 * Warning!!!
+	 * this function has two copies in ie7.js and ie8.js
+	 */
+	var selectorContainer = $('#' + selectId).closest(".netd-user-selector");
+	var noUsersSelectedTextName = selectorContainer.attr('num-users-selected-text');
+	var tokenInput = $(selectorContainer).find(".netd-token-input");
+
+	tokenInput.tokenInput("setBatchMode", true);
+	var optionList = $('#' + selectId + ' option');
+
+	netd.component.userSelector.beforeAddCallback(selectorContainer, selectId, optionList);
+
+	var ids = "";
+	var iOriginalUserIds = [];
+	var iNewUserIds = [];
+	if (originalSelectedValue){
+		iOriginalUserIds = originalSelectedValue.split(",");
+	}
+	for (var i = 0; i < optionList.length; i++) {
+        tokenInput.tokenInput("add", {id: optionList.eq(i).val(), name: optionList.eq(i).text(), tooltipContent: optionList.eq(i).attr("title")});
+		if (i != 0) {
+			ids += ",";
+		}
+		ids += optionList.eq(i).val();
+		iNewUserIds[i] = optionList.eq(i).val();
+	}
+	var iAddUserIds = $(iNewUserIds).not(iOriginalUserIds).get();
+	var iDeletedUserIds = $(iOriginalUserIds).not(iNewUserIds).get();
+
+	netd.component.updateNoOfSelectedUsers(selectorContainer, noUsersSelectedTextName, optionList.length);
+
+	var inputField = $(selectorContainer).find('input[name="' + hiddenInput + '"]');
+	$(inputField).val(ids);
+
+	tokenInput.tokenInput("setBatchMode", false);
+	netd.component.userSelector.onChangeCallback(selectorContainer, selectId, {addUserIds: iAddUserIds, deletedUserIds: iDeletedUserIds});
+};
+
+netd.component.addUserToUserSelector = function (item, selectId, hiddenInput) {
+    var $selector = $('#' + selectId);
+    var userId = item.id,
+        caption = item.name,
+        tooltip = item.tooltipContent,
+        type = item.type,
+        dataAttrs = item['data-attrs'],
+        selectorContainer = $selector.closest(".netd-user-selector");
+	if ($('option[value="' + userId + '"]', $selector).length == 0) {
+		var inputField = $(selectorContainer).find('input[name="' + hiddenInput + '"]');
+		var newOpt  = $('<option title="' + tooltip+ '" value="' + userId +'" type="' + type +'">' + caption + '</option>');
+		if(dataAttrs){
+			for(var j in dataAttrs){
+				$(newOpt).attr(j,dataAttrs[j]);
+			}
+		}
+		$selector.append($(newOpt));
+		$(inputField).val($(inputField).val() + ',' + userId);
+		$(inputField).val($(inputField).val().replace(/^,/, ''));
+	}
+	netd.component.userSelector.onChangeCallback(selectorContainer, selectId, {addUserIds : [userId]});
+};
+
+netd.component.manualRemoveUserFromUserSelector = function (userid, selectId) {
+
+	var selectorContainer = $('#'+ selectId).closest(".netd-user-selector").find('li').each(function(){
+		if ($(this).data('tokeninput').id === userid){
+			$('a', this).click();
+		}
+	});
+};
+
+netd.component.removeUserFromUserSelector = function (userid, selectId, hiddenInput) {
+    var $select = $('#' + selectId);
+    var selectorContainer = $select.closest(".netd-user-selector");
+	var inputField = $(selectorContainer).find('input[name="' + hiddenInput + '"]');
+	$('option[value="' + userid + '"]', $select).remove();
+
+	if ($(inputField).val()) {
+		var hiddenArray = $(inputField).val().split(',');
+		hiddenArray = jQuery.grep(hiddenArray, function (value) {
+			return value != userid;
+		});
+		$(inputField).val(hiddenArray.join(","));
+	}
+	netd.component.userSelector.onChangeCallback(selectorContainer, selectId, {deletedUserIds : [userid]});
+};
+
+netd.component.focusUserSelector = function (searchInput, userSelectorButtonId) {
+	setTimeout(function () {
+        var $tokenInput = $('#token-input-' + searchInput);
+        if ($tokenInput.is(':visible')){
+        	$tokenInput.focus();
+        	$tokenInput.select();
+        } else {
+        	if (userSelectorButtonId){
+        		var button = $('#' + userSelectorButtonId);
+        		button.focus();
+        	}
+        }
+	}, 10);
+};
+
+netd.component.updateComponentSelectorLink = function (displayFieldId, selectLinkId, clearLinkId) {
+	var selectedValue = $("input[name='" + displayFieldId + "']").val();
+    var $link = $("#" + selectLinkId);
+    if (selectedValue === "") {
+		selectedValue = $link.attr("data-default-text");
+		$("#" + clearLinkId).addClass("visibility-hidden");
+	} else {
+		$("#" + clearLinkId).removeClass("visibility-hidden");
+	}
+	$link.html(selectedValue)
+	$('#' + selectLinkId).change();
+};
+
+netd.component.updateComponentSelectorLinkWithSelectedOptions = function(options, fieldId) {
+	$("input[name='" + fieldId + "']").val(options[0].value);
+	$("input[name='" + fieldId + "_text" + "']").val(options[0].text);
+	netd.component.updateComponentSelectorLink(fieldId + "_text", fieldId + "_link", fieldId + "_clear");
+};
+
+netd.component.accordion = (function($){
+	"use strict";
+	function init() {
+	    var $accordionStatusContainer = $('.netd-accordion-status-container');
+	    var icon = $accordionStatusContainer.attr('icon');
+		$('.netd-accordion-status-container .status-header').each(function () {
+			if ($('.netd-accordion-draggable', $(this)).length == 0) {
+				$('.toolbar_header_icons', $(this)).prepend(icon);
+			}
+		});
+
+		// HANDLE NULL in case no accordion in the page
+		if ($accordionStatusContainer.length > 0) {
+			$accordionStatusContainer.sortable({
+				helper: 'clone'
+			});
+		}
+
+	    var $draggable = $('.netd-accordion-draggable');
+	    $draggable.css('cursor', 'move');
+		$('.netd-accordion-status-container .netd-accordion .status-header').css('cursor', 'pointer');
+		$draggable.click(function (e) {
+			e.stopPropagation();
+		});
+	    var $statusHeader = $('.netd-accordion .status-header');
+	    $statusHeader.each(function(){
+			this.setAttribute('aria-label', $(this).text());
+	    });
+	}
+
+	function initOnce(){
+		$(document).on("click.netd-accordion", ".netd-accordion .status-header", function (e) {
+			var thisStatusHander = $(this);
+			var thisAccordion = thisStatusHander.closest('.netd-accordion')
+			var beforeExpand = thisAccordion.attr('netd-event-before-expand');
+			var beforeCollapse = thisAccordion.attr('netd-event-before-collapse');
+			var content= thisStatusHander.next(".content");
+			var shouldExpand = thisStatusHander.attr("aria-expanded")=="false";
+			var canAction = executeAccordionEvent(thisStatusHander, 'before', beforeExpand, beforeCollapse, shouldExpand);
+			if (canAction == false) {
+				return;
+			}
+			netd.component.dropDownButton.closeAll(thisAccordion);
+			thisStatusHander.find("button").andSelf().attr("aria-expanded", shouldExpand);
+			setTimeout(function(){
+				thisAccordion.find('.netd-accordion-icon.netd-accordion-icon_e').css("display",shouldExpand ? 'none' : 'inline-block');
+				thisAccordion.find('.netd-accordion-icon.netd-accordion-icon_s').css("display",shouldExpand ? 'inline-block' : 'none');
+				content[shouldExpand ? 'slideDown' : 'slideUp']('fast', function() {
+					var afterExpand = thisAccordion.attr('netd-event-after-expand');
+					var afterCollapse = thisAccordion.attr('netd-event-after-collapse');
+					executeAccordionEvent(thisStatusHander, 'after', afterExpand, afterCollapse, shouldExpand);
+				});
+			}, 50);
+		});
+	}
+	function executeAccordionEvent(thisStatusHander, eventType, expandMethod, collapseMethod, toExpandStatus) {
+		if (expandMethod && toExpandStatus) {
+			var fn = getFunctionByName(expandMethod, window);
+			if (fn) {
+				return fn.call(thisStatusHander, {type: eventType + "expand"});
+			}
+		}
+		if (collapseMethod && !toExpandStatus) {
+			var fn = getFunctionByName(collapseMethod, window);
+			if (fn) {
+				return fn.call(thisStatusHander, {type: eventType + "collaspe"});
+			}
+		}
+		return true;
+	}
+	return {
+		init: init,
+		initOnce: initOnce
+	}
+})($);
+
+
+netd.component.initComponentCompetencySelector = function () {
+	$(".netd-competency-selector").each(function () {
+		var selector = $(this);
+		var selectorId = selector.attr('id');
+		if (!selector.hasClass("inited")) {
+			selector.addClass("inited");
+			selector.flexbox('COMPETENCYSELECTOR?request=SEARCH&ajax=Y', {
+				resultTemplate: '<div class="row-content">{type}: <span id="{id}">{name}</span></div>',
+				width: 400,
+				watermark: $(this).attr("data-watermark"),
+				minChars: 1,
+				paging: {
+					pageSize: 10
+				},
+				onSelect: function () {
+					var inputElm = $(this);
+					var hiddenElm = selector.find("input[name=" + selectorId + "]");
+					var selectedKey = hiddenElm.val();
+					inputElm.val('');
+
+					$.post("COMPETENCYSELECTOR", {
+							request: 'FETCH_COMPETENCIES_WITH_LEVELS',
+							key: selectedKey
+						},
+						function (data) {
+							if (data.status == "OK") {
+								var competenciesSelectedCallback = selector.attr('competencies-selected-callback');
+								getFunctionByName(competenciesSelectedCallback, window)(data.list, selector);
+							} else {
+								var errHandleCallback = $(this).attr("error-handle-callback");
+								if (errHandleCallback) {
+									getFunctionByName(errHandleCallback, window)(data.status);
+								}
+							}
+						},
+						"json");
+				}
+			});
+		}
+	});
+};
+
+
+netd.component.expandAllAccordion = function () {
+	$('.netd-accordion:visible').each(function() {
+		netd.component.expandAccordion(this);
+	});
+};
+
+netd.component.expandAccordion = function (theAccordion) {
+	$(theAccordion).find('.status-header').attr('aria-expanded', true);
+	$(theAccordion).find('.button-link').attr("aria-expanded", true);
+	$(theAccordion).find('.netd-accordion-icon_e').hide();
+	$(theAccordion).find('.netd-accordion-icon_s').show();
+	$(theAccordion).find('.ui-icon:visible').css('display', 'inline-block');
+	$(theAccordion).find('> .content').slideDown('fast');
+
+};
+
+netd.component.collapseAllAccordion = function () {
+	$('.netd-accordion:visible').each(function() {
+		netd.component.collapseAccordion(this);
+	});
+};
+
+netd.component.collapseAccordion = function (theAccordion) {
+	$(theAccordion).find('.status-header').attr('aria-expanded', false);
+	$(theAccordion).find('.button-link').attr("aria-expanded", false);
+	$(theAccordion).find('.netd-accordion-icon_s').hide();
+	$(theAccordion).find('.netd-accordion-icon_e').show();
+	$(theAccordion).find('.ui-icon:visible').css('display', 'inline-block');
+	$(theAccordion).find('> .content').slideUp('fast');
+};
+
+netd.component.initComponentHoverLinks = function () {
+	$(".netd-hover-link").each(function () {
+		$(this).children(".netd-hover-actions").addClass('visibility-hidden');
+		$(this).hover(function () {
+			$(this).children(".netd-hover-actions").toggleClass('visibility-hidden');
+		});
+	});
+};
+
+netd.component.initComponentTextInputs = function () {
+	$(".netd-text-input").each(function () {
+		var textInput = this;
+		var attchLabelAction = $(textInput).attr('attach-label-action');
+		if (attchLabelAction == 'Y') {
+			var label = $(textInput).prev();
+			if ($(label).is('label')) {
+				$(textInput).click(function () {
+					$('a', $(label)).click();
+				});
+			}
+		}
+		netd.component.initEventHandlers($(textInput));
+	});
+};
+
+netd.component.initEventHandlers = function () {
+	if(netd.component.initEventHandlersReady){
+		return
+	}
+	$(document).on("click.netdEventHandler optionchange.netdEventHandler keypress.netdEventHandler",
+					".netd-button[eventhandlers],.netd-text-input[eventhandlers],.netd-box-input[eventhandlers]",
+					function __tigger_netd_eventhandler(e){
+		var o=$(this),
+			data=$.parseJSON(o.attr("eventhandlers")),
+			i, item;
+		for(i=0; item=data[i]; i++){
+			var methodName = item.method;
+			if (methodName && item.event == e.type) {
+				var callback = getFunctionByName(methodName, window), ret;
+				if (item.event == "keypress" && item.keycode) {
+					if(e.which == item.keycode){
+						ret=callback.call(e.currentTarget, e);
+						e.preventDefault();
+					}
+					continue;
+				} else {
+					ret=callback.call(e.currentTarget, e);
+				}
+				if(ret===false){
+					return false;
+				}
+			}
+		}
+	});
+	netd.component.initEventHandlersReady=true;
+};
+
+netd.component.addInitCallback = function (callback) {
+	var oldCallback = this.initCallback;
+	if (typeof oldCallback != 'function') {
+		this.initCallback = callback;
+	} else {
+		this.initCallback = function () {
+			if (oldCallback) {
+				oldCallback();
+			}
+			callback();
+		};
+	}
+};
+
+netd.component.initComponentFilterForm = function () {
+	$('.netd-filter-form').each(function () {
+		var $this = $(this);
+		if ($this.is('.netd-filter-auto-submit')) {
+			// auto submit form when there is only one input for filter form
+			if ($this.find('.netd-filter-group:visible input, .netd-filter-group:visible select')
+					.filter(function() {
+						return !$(this).is('input') || ($(this).is('[type]') && $(this).attr('type').toLowerCase() != 'hidden');
+					}).length == 1
+				&& $this.find('.netd-filter-group:visible select').length == 1) {
+
+				$this.find('.netd-filter-group select')
+					.unbind('change.netd-filter-form')
+					.bind('change.netd-filter-form', function () {
+						$this.closest('form.netd-form').submit();
+					});
+
+			}
+		}
+		var $filterForm = $this.parent();
+		if ($filterForm.siblings('.netd-filter-toggle').length == 1 && !$filterForm.hasClass('filter-form-ui-inited')) {
+			var $toggle = $($filterForm.siblings('.netd-filter-toggle')[0]);
+			var formName = $filterForm.attr('name');
+			if (formName + '-toggle' == $toggle.attr('name')) {
+				$toggle.bind('click', function (e) {
+					if ($filterForm.hasClass('invisible')) {
+						$filterForm.slideDown(function(){
+							$filterForm.removeClass('invisible');
+						});
+						$toggle
+							.attr("aria-expanded", "true")
+							.children("span.netd-icon").toggleClass("icon-caret-down icon-caret-right")
+							.next().text(getComponentAttribute($toggle, 'hide-filter-toggle-text'));
+					} else {
+						$filterForm.slideUp(function(){
+							$filterForm.addClass('invisible');
+						});
+						$toggle
+							.attr("aria-expanded", "false")
+							.children("span.netd-icon").toggleClass("icon-caret-down icon-caret-right")
+							.next().text(getComponentAttribute($toggle, 'show-filter-toggle-text'));
+					}
+				});
+			}
+			$filterForm.addClass('filter-form-ui-inited');
+		}
+	});
+};
+
+netd.component.backToTop = (function($){
+	"use strict";
+
+	var offsetToTopCallback = null;
+	var scrollToPositionCallback = null;
+
+	function getOffsetOfTop() {
+		var offSetOfTop = 1;
+		if (offsetToTopCallback != null) {
+			offSetOfTop = offsetToTopCallback();
+		}
+		return offSetOfTop;
+	}
+
+	function init() {
+		offsetToTopCallback = getFunctionByName(getComponentAttribute($('.component-back-to-top'), 'offset-to-top-callback'), window);
+		scrollToPositionCallback = getFunctionByName(getComponentAttribute($('.component-back-to-top'), 'scroll-to-position-callback'), window);
+
+		if ($(window).scrollTop() == 0 || $(window).scrollTop() < getOffsetOfTop()) {
+			$('.component-back-to-top').hide();
+		}
+	}
+
+	function initOnce() {
+		$(window).scroll(function() {
+			if ($(this).scrollTop() > 1 && $(this).scrollTop() >= getOffsetOfTop()) {
+				$('.component-back-to-top:hidden').stop(true, true).fadeIn();
+			} else {
+				$('.component-back-to-top').stop(true, true).fadeOut();
+			}
+		});
+
+		$(document).on('click.backToTop', '.component-back-to-top a.scroll', function() {
+			var scrollTopPos = 0;
+			if (scrollToPositionCallback != null) {
+				scrollTopPos = scrollToPositionCallback();
+			}
+			$('html, body').animate({
+				scrollTop : scrollTopPos
+			}, 'slow');
+		});
+	}
+
+	return {
+		init: init,
+		initOnce: initOnce
+	}
+})($);
+
+netd.component.toolTip = {
+	cssFlag: '.netd-tooltip',
+	idFlagNotForInit: ':not(#tooltip-long)', //long title (length > 512) will be given a specific ID tooltip-long, see HTMLWidgets.java
+	init: function () {
+
+		var cssFlag = this.cssFlag;
+		var idFlagNotForInit = this.idFlagNotForInit;
+		var selector =  cssFlag + idFlagNotForInit ;
+		//for element having a long title, use jQuery Tooltip instead of jatt
+		if (typeof $.jatt == 'function' && $(selector).length > 0) {
+			$.jatt({
+				direction: 'e',
+				followMouse: false,
+				speed: 300,
+				zIndex: 9999,
+				tooltip: cssFlag,
+				deactivate: 'killToolTip',
+				xOffset: 5,
+				yOffset: 5
+			});
+
+			if(netd.component.toolTip.jattInitialized){
+				return;
+			}
+
+			$("#document-body").css("overflow", "visible");
+
+			var t, o=$();
+			$(document).on('mouseout.netd-tooltip', selector, function () {
+				o=$(this);
+				var timeout = o.attr("data-timeout") || 1000;
+				t = setTimeout(function () {
+					o.trigger("killToolTip");
+				}, timeout);
+			}).on('mouseout.netd-tooltip', '#tooltip', function () {
+				var timeout = o.attr("data-timeout") || 1000;
+				t = setTimeout(function () {
+					o.trigger("killToolTip");
+				}, timeout);
+			}).on('mouseover.netd-tooltip', selector+",#tooltip", function resetTimer(){
+				clearTimeout(t);
+			}).on('click.netd-tooltip', '#tooltip', function (e) {
+				e.stopPropagation();
+			}).bind('click.netd-tooltip', function () {
+				o.trigger('killToolTip');
+			});
+			netd.component.toolTip.jattInitialized=true;
+		} else if ($(selector).length > 0) {
+			if ("undefined"!=typeof console && console.log) {
+				console.log('Please enable jatt');
+			}
+		}
+	}
+};
+
+netd.component.initComponentTree = function () {
+	var dnd_cursor = 'move';
+	var default_tree_cursor = 'pointer';
+	var treeIndex = 0;
+	$('.netd-tree-container').each(function () {
+		if (!$(this).hasClass('tree-ui-inited')) {
+			$(this).addClass('tree-ui-inited');
+			treeIndex++;
+
+			var initId = getComponentAttribute(this, 'initId');
+			var dblclickAction = getFunctionByName(getComponentAttribute(this, 'dblclick'), window);
+			var clickAction = getFunctionByName(getComponentAttribute(this, 'click'), window);
+			var loadAction = getFunctionByName(getComponentAttribute(this, 'lazyload'), window);
+			var activateAction = getFunctionByName(getComponentAttribute(this, 'activate'), window);
+			var dndAction = getFunctionByName(getComponentAttribute(this, 'dnd'), window);
+			var selectMode = parseInt(getComponentAttribute(this, 'selectmode'));
+			var useRadioBox = getComponentAttribute(this, 'radiobox');
+			var initExpand = getComponentAttribute(this, 'init-expand');
+
+			var hasContextMenu = $(".tree-dropdown-menu", this).length > 0;
+			var tree = $('.netd-tree', this);
+
+			var options = {
+				clickFolderMode: 1,
+				debugLevel: 0,
+				selectMode: selectMode,
+				onRender: function (dtnode, nodeSpan) {
+					setComponentTreeNodeId(dtnode, nodeSpan);
+				}
+			};
+
+			if (clickAction != null) {
+				options = $.extend(options, {
+					onClick: function (node, event) {
+						if (hasContextMenu && $(".tree-dropdown-menu:visible").length > 0) {
+							$(".tree-dropdown-menu").hide();
+						}
+						if (node.getEventTargetType(event) == "title") {
+							executeComponentTreeNodeAction(tree, node, clickAction);
+						}
+						return true;
+					}
+				});
+			}
+
+			if (dblclickAction != null) {
+				options = $.extend(options, {
+					onDblClick: function (flag, node) {
+						executeComponentTreeNodeAction(tree, node, dblclickAction);
+					}
+				});
+			}
+			if (loadAction != null) {
+				options = $.extend(options, {
+					onLazyRead: function (node, event) {
+						executeComponentTreeNodeAction(tree, node, loadAction);
+					}
+				});
+			}
+			if (activateAction != null) {
+				options = $.extend(options, {
+					onActivate: function (node) {
+						executeComponentTreeNodeAction(tree, node, activateAction);
+					}
+				});
+			}
+			if (useRadioBox != null) {
+				options = $.extend(options, {
+					classNames: {checkbox: useRadioBox == 'Y' ? "dynatree-radio" : "dynatree-checkbox"},
+					checkbox: true
+				});
+			}
+			if (dndAction != null) {
+				options = $.extend(options, {
+					dnd: {
+						onDragStart: function (node) {
+							return true;
+						},
+						autoExpandMS: 1000,
+						preventVoidMoves: true,
+						onDragEnter: function (node, sourceNode) {
+							$('li a', tree).css('cursor', dnd_cursor);
+							return true;
+						},
+						onDragOver: function (node, sourceNode, hitMode) {
+							if (node.isDescendantOf(sourceNode)) {
+								return false;
+							}
+							if (!node.data.isFolder && hitMode === "over") {
+								return "after";
+							}
+						},
+						onDragStop: function (node) {
+							$('li a', tree).css('cursor', default_tree_cursor);
+						},
+						onDrop: function (node, sourceNode, hitMode, ui, draggable) {
+							if (!node.isDescendantOf(sourceNode)) {
+								var nodeSpan = findComponentTreeNodeSpan(tree, node);
+
+								if (dndAction.apply($(nodeSpan), Array.prototype.slice.call(arguments, 0))) {
+									sourceNode.move(node, hitMode);
+								}
+							}
+						}
+
+					}
+				});
+			}
+
+			if (hasContextMenu) {
+				$(".tree-dropdown-menu", this).attr('id', 'tree-dropdown-menu-' + treeIndex);
+				bindComponentTreeContextMenu(tree, 'tree-dropdown-menu-' + treeIndex);
+				options = $.extend(options, {
+					onCreate: function (dtnode, nodeSpan) {
+						$(nodeSpan).mouseup(function (e) {
+							if (e.button == 2) {
+								e.preventDefault();
+								var newNode = findComponentTreeNode(tree, nodeSpan);
+								if (newNode != null) {
+									var currentNode = $(tree).dynatree("getActiveNode");
+									if (currentNode != null) {
+										currentNode.deactivate();
+									}
+									newNode.activate();
+								}
+							}
+						});
+					},
+					onClick: function (node, event) {
+						if ($(".tree-dropdown-menu:visible").length > 0) {
+							$(".tree-dropdown-menu").hide();
+						}
+						if (clickAction != null && node.getEventTargetType(event) == "title") {
+							executeComponentTreeNodeAction(tree, node, clickAction);
+						}
+					}
+				});
+			}
+
+			$(tree).dynatree(options);
+
+			var dynatree = $(tree).dynatree("getTree");
+			if (initId != null && initExpand == "true") {
+				var selectedNode = dynatree.getNodeByKey(initId);
+				if (selectedNode != null) {
+					selectedNode.expand();
+					selectedNode.activate();
+				}
+			}
+		}
+	});
+};
+
+netd.component.reloadComponentTreeNode = function (node, includeItself) {
+	if (includeItself) {
+		var parent = node.getParent();
+		if (parent != null) {
+			node = parent;
+		}
+	}
+	if (node && node.isLazy()) {
+		node.reloadChildren();
+	}
+
+};
+
+netd.component.initComponentBoxInputs = function () {
+	if(!netd.component.initComponentBoxInputsReady){
+		$(document).on("change.netdcomponentboxinput", ".netd-box-input", function(){
+			var boxInput= $(this),
+				labelInput = boxInput.closest('.netd-box-container'),
+				isChecked = boxInput.prop('checked'),
+				isEnabled = boxInput.is(":enabled"),
+				group = boxInput.closest('.netd-indent-group');
+			if ( boxInput.is('.netd-radiobox')) {
+				// disable all the radio option first and then enable all the radio-button
+				toggleChildIndentGroup(group, true);
+				group.children('.netd-box-container').each(function() {
+					$(this).find('.netd-box-input').prop('disabled', false);
+				});
+			}
+			toggleInputElements(labelInput, !(isChecked && isEnabled));
+			var child = $(labelInput).next('.netd-indent-group');
+			if (child && $(child).length > 0) {
+				toggleChildIndentGroup(child, !(isChecked && isEnabled));
+			}
+			boxInput.prop('checked', isChecked);
+			boxInput.prop('disabled', !isEnabled);
+			boxInput.triggerHandler('optionchange.netdEventHandler');
+		});
+		netd.component.initComponentBoxInputsReady=true;
+	}
+	$(".netd-box-input").filter(":checked,.netd-checkbox").each(function(){
+		var boxInput= $(this),
+		labelInput = boxInput.closest('.netd-box-container'),
+		isChecked = boxInput.prop('checked'),
+		isEnabled = boxInput.is(":enabled");
+		toggleInputElements(labelInput, !(isChecked && isEnabled));
+		var child = $(labelInput).next('.netd-indent-group');
+		if (child && $(child).length > 0) {
+			toggleChildIndentGroup(child, !(isChecked && isEnabled));
+		}
+		boxInput.prop('checked', isChecked);
+		boxInput.prop('disabled', !isEnabled);
+		$(this).triggerHandler("change.netdcomponentboxinput");
+	});
+};
+
+netd.component.filterGroup = (function($) {
+	"use strict";
+	function selectAllFn(facetContainer, isChecked) {
+		facetContainer.find("input.top").prop('checked', isChecked)
+										.prop('readOnly', isChecked);
+
+		if(isChecked){
+			return facetContainer.find("input.child:checked").prop('checked', false).length!=0;
+		}
+	}
+	function getCheckedValues(ele){
+		return $(ele.form.elements[ele.name]).filter(':checked').map(function(){
+			return this.value;
+		}).get();
+	}
+	return {
+		selectAll: function(facetContainer){
+			selectAllFn(facetContainer, true);
+		},
+		initOnce : function(){
+			$(document).on("change.netdComponentFilterGroup", ".netd-filter-group .clickable", function(e) {
+				var isTop = $(this).hasClass("top");
+				var facetContainer = $(this).closest("div.netd-filter-group");
+				if (isTop) {
+					if(!selectAllFn(facetContainer, true)){
+						e.preventDefault();
+						return;
+					}
+				} else {
+					// child is clicked
+					var childCount = facetContainer.find("input.child:checked").length;
+					selectAllFn(facetContainer, childCount == 0);
+				}
+				var selectedValues = getCheckedValues(this);
+				var customEventName = facetContainer.data('event');
+				$(document).trigger(customEventName, [{
+					'name': this.name,
+					'selectedValues': selectedValues
+				}]);
+			});
+		}
+	}
+})($);
+
+netd.component.initComponentActionPanel = function (target) {
+
+	target = target || document;
+	$(".actions-panel", target).each(function () {
+		netd.component.initComponentAction($(this));
+	});
+};
+
+netd.component.initComponentAction = function (actionPanel) {
+
+	$(actionPanel).find("li").children().each(function() {
+		$(this).unbind('click');
+		var methodName = $(this).attr("module-link-action");
+		if (methodName) {
+			$(this).click(function (e) {
+				if (!$(this).hasClass("disabled")) {
+					getFunctionByName(methodName, window).apply($(this), [e]);
+				}
+			});
+		}
+	});
+};
+
+netd.component.initQuickNavigation = function () {
+
+	if ($('#manage-center-container, #navigation-container').length == 0) {
+		return;
+	}
+
+	var renderHandler = function() {
+		$.ajax({
+			url: getTransactionUrl('QUICK_NAVIGATION') + "?ACTION=RENDER"
+		}).done(function(response) {
+			$('body').append(response);
+			initHandler();
+		});
+	};
+
+	var hideShowHandler = renderHandler;
+
+	var initHandler = function() {
+		var cache = {};
+		var container = $('#quick-navigation');
+		var keyword = $('#quick-navigation #quick-nav-keyword');
+		var closeButton = $('#quick-navigation .close-btn');
+
+		var tx = container.data('init-tx');
+		var action = container.data('init-action');
+		var transactionUrl = getTransactionUrl(tx) + "?ACTION=" + action;
+
+		keyword.autocomplete({
+			source: function( request, response ) {
+				var term = request.term;
+				if (term in cache) {
+					response(cache[term]);
+					return;
+				}
+
+				$.getJSON(transactionUrl, request, function(data, status, xhr ) {
+					cache[term] = data;
+					response(data);
+				});
+			},
+			"autoFocus": true,
+			"select": function( event, data ) {
+				var url = data.item.value;
+				if (!data.item.isWindowPopup) {
+					window.location.href = url;
+				}else if (data.item.isBlankWindow) {
+					window.open(url);
+				} else if (data.item.windowPopupTarget) {
+					NewWindow(url, data.item.windowPopupTarget);
+				} else {
+					NewWindow(url);
+				}
+				hideShowHandler(event);
+				event.preventDefault();
+			},
+			"focus": function( event, ui ) {
+				event.preventDefault();
+			},
+			"create": function() {
+				// need to handle this as data tag is version specific
+				var instance = $(this).data('ui-autocomplete');
+				if (typeof instance == 'undefined') {
+					instance = $(this).data('autocomplete');
+				}
+
+				instance._renderItem = function( ul, item ) {
+					return $( "<li>")
+						.data("item.autocomplete", item)
+						.append(
+							$('<a>')
+								.append($('<span>', {"class": "menu-name", text: item.label + ' '}))
+								.append($('<span>', {"class": "menu-path", text: item.path + ' '}))
+						)
+						.appendTo( ul );
+				};
+			}
+		}).autocomplete("widget").attr("id", "quick-nav-suggestion-list");
+
+		closeButton.click(function() {
+			container.addClass('invisible');
+		});
+
+		$(document).keydown(function(event) {
+			// esc
+			if (event.which == 27 && !container.hasClass('invisible')) {
+				closeButton.click();
+			}
+		});
+
+		hideShowHandler = function() {
+			container.toggleClass('invisible');
+			if (keyword.is(':visible')) {
+				keyword.val(null).focus();
+			}
+		}
+
+		keyword.keydown(function _preventSubmit(event){
+			if(event.keyCode == 13) {
+				event.preventDefault();
+				return false;
+			}
+		});
+
+		hideShowHandler();
+	}
+
+	var count = 0;
+	$(document).keyup(function(event) {
+		// shift shift
+		if (event.which == 16) {
+			if (count++ == 0) {
+				setTimeout(function() {
+					count = 0;
+				}, 500);
+			}
+			else if (count == 2) {
+				hideShowHandler();
+			}
+		}
+		else {
+			count = 0;
+		}
+	});
+};
+
+
+netd.component.multiSelectDropdown = (function($){
+	"use strict";
+	function keyeventProxy(keycode, handler){
+		return function(e){
+			if(e.which == keycode || ($.isArray(keycode) && $.inArray(e.which, keycode)>-1)){
+				handler.call(this, e);
+			}
+		}
+	}
+	function getObj(obj){
+		var $container = $(obj).closest(".netd-multi-select-dropdown-container"),
+			$input= $container.children(".netd-multi-select-input"),
+			$list= $container.children(".netd-multi-select-list"),
+			$checkboxes= $container.find(".netd-multi-select-checkbox");
+		return {
+			showOptions: function(){
+				if(!$list.hasClass("display-none")){
+					return;
+				}
+				$input.attr("aria-expanded", true);
+				$list.removeClass("display-none");
+				$checkboxes.first().focus();
+				var me=this;
+				netd.component.onNetdFocusOut($container).then(function(e){
+					me.hideOptions();
+				});
+			},
+			hideOptions: function() {
+				$list.addClass("display-none");
+				$input.attr("aria-expanded", false);
+			},
+			updateSelectedValue:function(){
+				var checkboxes=$checkboxes;
+				var checked=$checkboxes.filter(":checked");
+				var selectedValue;
+				if (checked.length == $checkboxes.length) {
+					selectedValue = $container.find(".netd-multi-select-all").text();
+				}else if (checked.length == 0) {
+					selectedValue = "";
+				} else {
+					selectedValue = checked.map(function() {
+						return $(this).parent("label").text();
+					}).get().join(",");
+				}
+				$input.val(selectedValue);
+			},
+			selectAllNone: function(checked){
+				$checkboxes.prop("checked", checked);
+				this.updateSelectedValue();
+				this.hideOptions();
+				$input.focus();
+			}
+
+		};
+	}
+	function showOptions(e) {
+		e.preventDefault();
+		getObj(this).showOptions();
+	}
+	function selectAll(e){
+		e.preventDefault();
+		getObj(this).selectAllNone(true);
+	}
+	function selectNone(e){
+		e.preventDefault();
+		getObj(this).selectAllNone(false);
+	}
+	function selectUpdate(e){
+		getObj(this).updateSelectedValue();
+	}
+	function updateAllDropdownsInputValFromSelected() {
+		$(".netd-multi-select-dropdown-container").each(function() {
+			getObj(this).updateSelectedValue();
+		});
+	}
+	function syncAllDropDownInputValFromSelectedOnInit() {
+		updateAllDropdownsInputValFromSelected();
+		// For firefox history.back behavior
+		$(window).on("pageshow.netdMultiSelectDropdown", function(event) {
+			if (event.originalEvent.persisted) {
+				updateAllDropdownsInputValFromSelected();
+			}
+		});
+	}
+	function initOnce() {
+		$(document)
+			.on("click.netdMultiSelectDropdown", ".netd-multi-select-dropdown-container .netd-multi-select-input", showOptions)
+			.on("keydown.netdMultiSelectDropdown", ".netd-multi-select-dropdown-container .netd-multi-select-input", keyeventProxy([KEY.UP, KEY.DOWN, KEY.ENTER], showOptions))
+			.on("click.netdMultiSelectDropdown", ".netd-multi-select-dropdown-container .netd-multi-select-checkbox", selectUpdate)
+			.on("click.netdMultiSelectDropdown", ".netd-multi-select-dropdown-container .netd-multi-select-all", selectAll)
+			.on("click.netdMultiSelectDropdown", ".netd-multi-select-dropdown-container .netd-multi-select-none", selectNone);
+		syncAllDropDownInputValFromSelectedOnInit();
+	}
+	return {
+		initOnce: initOnce,
+		updateAllDropdownsInputValFromSelected: updateAllDropdownsInputValFromSelected
+	};
+})($);
+
+netd.component.previewContent = function(options) {
+
+	var previewDialog = $('<div/>');
+	$(previewDialog).dialog({
+		title: options.title,
+		width: "auto",
+		height: "auto",
+		dialogClass: "netd-content-previewer",
+		autoOpen: false,
+		modal: true,
+		closeOnEscape: true,
+		buttons: {
+			close: {
+				text: options.closeButton,
+				id: "netd-content-previewer-close-button",
+				click: function () {
+					$(this).dialog("close");
+				}
+			}
+		},
+		close: function () {
+			$(this).remove();
+		}
+	});
+
+	$.get(getTransactionUrl(options.tx), options.params, function (data) {
+		$(previewDialog).html($(data));
+		$(previewDialog).dialog('open');
+	});
+
+};
+
+function toggleChildIndentGroup(container, isDisabled) {
+	if ($(container).is(".netd-indent-group")) {
+		$(container).children().each(function() {
+			if ($(this).is(".netd-indent-group")) {
+				toggleChildIndentGroup(this, isDisabled);
+			} else {
+				toggleInputElements(this, isDisabled);
+			}
+		});
+	} else {
+		toggleInputElements(container, isDisabled);
+	}
+}
+
+function toggleInputElements(container, isDisabled) {
+	var hasOption = false;
+	$(container).closest(".netd-indent-group").children().each(function() {
+		if (!hasOption) {
+			hasOption = $(this).find('.netd-radiobox:checked').length > 0;
+		}
+	});
+
+	$(container).find('input, select, textarea, button').each(function() {
+		if (!isDisabled && !hasOption && $(this).is('.netd-radiobox')) {
+			var isDefaultOption = getComponentAttribute($(this), 'default-option');
+			if (isDefaultOption) {
+				$(this).prop('checked', true);
+			}
+		}
+
+        var checkableSibling = $(this).prevAll('input[type="radio"], input[type="checkbox"], input[type="RADIO"], input[type="CHECKBOX"]');
+        if (checkableSibling.length > 0 && !checkableSibling.prop('checked') && !isDisabled) {
+            return;
+        }
+
+		$(this).prop('disabled', isDisabled)
+			   .triggerHandler("netdStateChange");
+
+		if ($(this).is('input[id$=dateflag]')){
+			isDisabled ? $(this).val('0') : $(this).val('1');
+		}
+	});
+
+	var elements = [];
+	var inputIds = $(container).attr('netd-child-input-id');
+	if (inputIds) {
+		elements = $.merge(elements, $.map(inputIds.split(','), function(value, index) {
+										return $(container).find('#' + value);
+									})
+						);
+	}
+	var inputClass = $(container).attr('netd-child-input-class');
+	if (inputClass) {
+		elements = $.merge(elements, $.map(inputClass.split(','), function(value, index) {
+											return $(container).find('.' + value);
+										})
+						);
+	}
+
+	if (elements.length > 0) {
+		$.each(elements, function() {
+			if (isDisabled) {
+				disableElementTag(this);
+			} else {
+				enableElementTag(this);
+			}
+		});
+	}
+}
+
+function disableElementTag(elementTag) {
+	if ($(elementTag).length == 0) {
+		return;
+	}
+	if ($(elementTag).hasClass('netd-user-selector')) {
+		netd.component.disableUserSelector(elementTag);
+	} else {
+		var innerSpan = $(elementTag).next('.disabled-tag');
+		if ($(innerSpan).length == 0) {
+			var pos = $(elementTag).position();
+			var width = $(elementTag).outerWidth();
+			var height = $(elementTag).outerHeight();
+			innerSpan = $('<span class="disabled-tag ui-widget-overlay"/>');
+			$(elementTag).after(innerSpan);
+
+			$(innerSpan).css({position : "absolute",
+						  top: pos.top + "px",
+						  left: pos.left + "px",
+						  width: width,
+						  height: height,
+						  opacity : 0
+					});
+		}
+	}
+}
+
+function enableElementTag(elementTag) {
+	if ($(elementTag).hasClass('netd-user-selector')) {
+		netd.component.enableUserSelector(elementTag);
+	} else {
+		$(elementTag).next('.disabled-tag').remove();
+	}
+}
+
+function bindComponentTreeContextMenu(tree, menuId) {
+	$(tree).contextMenu({menu: menuId}, function (action, el, pos) {
+		var selectedNode = $(tree).dynatree("getActiveNode");
+		if (selectedNode != null) {
+			var fn = getFunctionByName(action, window);
+			executeComponentTreeNodeAction(tree, selectedNode, fn);
+		}
+	});
+}
+
+function findComponentTreeNode(tree, nodeSpan) {
+	var title = $(nodeSpan).find('.dynatree-title');
+	if (title != null) {
+		var node_id = getComponentAttribute(title, 'node-id');
+		if (node_id != null) {
+			return $(tree).dynatree('getTree').getNodeByKey(node_id);
+		}
+	}
+	return null;
+}
+
+function findComponentTreeNodeSpan(treeDiv, node) {
+	var htmlNode = $('li a[data-node-id="' + node.data.key + '"]', treeDiv);
+	return htmlNode.parent();
+}
+
+function setComponentTreeNodeId(node, nodeSpan) {
+	var nodeUid = node.data.key.replace(/[^\w]/g, '_'); // replace '*ROOT*' to '_ROOT_'
+	// extra attribute request by Lester for QTP testing
+	$(nodeSpan).children(".dynatree-expander").attr('id', 'EXPAND_NODE_ID_' + nodeUid);
+	$(nodeSpan).children(".dynatree-connector").attr('id', 'LEAF_NODE_ID_' + nodeUid);
+	$(nodeSpan).children(".dynatree-title").attr('id', 'NODE_ID_' + nodeUid);
+	$(nodeSpan).children(".dynatree-title").attr('data-node-id', node.data.key);
+}
+
+function executeComponentTreeNodeAction(treeDiv, node, fn) {
+	var nodeSpan = findComponentTreeNodeSpan(treeDiv, node);
+	node.activate();
+	fn.apply($(nodeSpan));
+}
+
+function getComponentAttribute(component, key) {
+	return $(component).attr('data-' + key);
+}
+
+netd.component.redirectTopLevelWindow = function(href) {
+    window.top.location.href = href;
+};
+
+netd.component.imagePreviewer = {
+
+	init: function() {
+
+		$('.netd-image-preview').on('mouseover click', function(e) {
+			e.stopPropagation();
+			var previewWrapper = $(this).prev();
+			var srcField = previewWrapper.find("input[name='" + $(this).attr("data-image-preview-src") + "']");
+			if (srcField) {
+				var tooltipWrapper = previewWrapper.find(".preview-image-tooltip");
+				tooltipWrapper.html("<div class='arrow-down'></div><img class='sys-default-image' src='" + srcField.val() + "'>");
+				tooltipWrapper.fadeIn();
+				$(document).off('click').on('click', function() {
+					tooltipWrapper.fadeOut().empty();
+				});
+			}
+		});
+
+	}
+};
+
+netd.component.setupOverflowTableWrapperButton = function(container, button, containerSelector, dropdownItemSelector) {
+
+	var containerFinalSelector = '.overflow-table-wrapper td ' + containerSelector;
+	button.closest(containerFinalSelector).each(function() {
+		var dropdownItem = $(dropdownItemSelector, this);
+		var updateCss = function() {
+			dropdownItem.css({
+				'position': 'fixed',
+				'left': (button.offset().left),
+				'top': (button.outerHeight() + button.offset().top - $(window).scrollTop())
+			});
+		}
+		$(container).mouseenter(updateCss);
+		$(window).scroll(updateCss);
+
+		var listBottomPosition = (button.outerHeight() + button.offset().top + dropdownItem.outerHeight());
+		var visibleWindowsHeight = ($(document).height());
+		if (listBottomPosition > visibleWindowsHeight) {
+		   var spacingOffset = listBottomPosition - visibleWindowsHeight;
+		   $('body').css('padding-bottom', spacingOffset * 2);
+		}
+	});
+};
+
+netd.component.assignmentSwitcher = (function() {
+
+    var AssignmentAccessor = function(txCode, actions) {
+        this.txCode = txCode;
+        this.actions = actions;
+        return this;
+    };
+
+    AssignmentAccessor.prototype.getList = function(assignmentId, callback) {
+        var data = $.extend({
+                                "UID": assignmentId
+                            }, this.actions.list);
+        $.get(getTransactionUrl(this.txCode), data, function(data) {
+            callback(data);
+        });
+    };
+
+    AssignmentAccessor.prototype.switchAssignment = function(assignmentId, callback) {
+        var data = $.extend({
+                                "ASSIGNMENT_ID": assignmentId
+                            }, this.actions.switchAssignment);
+        $.get(getTransactionUrl(this.txCode), data, function(data) {
+            callback(data);
+        });
+    };
+
+    var UserEditorAssignmentAccessor = function() {
+
+        var accessor = new AssignmentAccessor("EDITUSER", {
+            list: {
+                "ACT": "LIST_ASSIGNMENTS"
+            }
+        });
+
+        accessor.switchAssignment = function(assignmentId) {
+            $("#TX").val("EDITUSER");
+            $("#ACT").val("SWITCH_ASSIGNMENT");
+            $("#UID").val(assignmentId);
+            $("#userform").submit();
+        };
+        accessor.createAssignment = function(username) {
+            $("#TX").val("SETUSER");
+            $("#ACT").val("CREATE_ASSIGNMENT");
+            $("#UID").val(username);
+            $("#userform").submit();
+        };
+        accessor.deleteAssignment = function(assignmentId) {
+            $("#TX").val("SETUSER");
+            $("#ACT").val("DELETE_ASSIGNMENT");
+            $("#UID").val(assignmentId);
+
+            var $userform = $("#userform");
+            jConfirm($userform.attr('DELETETITLE'),
+                     $userform.attr('DELETEMSG'),
+                     function() {
+                         $("#userform").submit();
+                     },
+                     $userform.attr('DELETEOK'),
+                     $userform.attr('DELETECANCEL'));
+        };
+
+        return accessor;
+    };
+
+    var AssignmentListHandler = function($dialogContent, accessor) {
+        this.$dialogContent = $dialogContent;
+        this.accessor = accessor;
+        return this;
+    };
+
+    AssignmentListHandler.prototype.handleList = function(data) {
+
+        function dummyDomManipulationForIE8() {
+            var selectedIcon = $dialogContent.find('i');
+            selectedIcon.clone().insertAfter(selectedIcon);
+            selectedIcon.remove();
+        }
+
+        if (data.status === "failed") {
+        	alert(data.results);
+        } else {
+	        this.$dialogContent.html(data.dataContent);
+	        this.bindEvents();
+	        this.$dialogContent.dialog('open');
+	        dummyDomManipulationForIE8();
+    	}
+    };
+
+    AssignmentListHandler.prototype.bindEvents = function() {
+        var self = this,
+            redirectIfSuccess = function(data) {
+
+                if (data && data.status === 'success' && data.redirect) {
+
+                    netd.component.redirectTopLevelWindow(data.redirect);
+                } else {
+
+                    alert(data.results);
+                    self.$dialogContent.dialog('close');
+                }
+            };
+
+        function bindSelectAssignmentHandler() {
+            self.$dialogContent.find('li.assignment:not(.selected)').on('click', function() {
+                self.accessor.switchAssignment($(this).prop('id'), redirectIfSuccess);
+            });
+        }
+
+        bindSelectAssignmentHandler();
+    };
+
+    var UserEditorAssignmentListHandler = function($dialogContent, accessor) {
+
+        var handler = new AssignmentListHandler($dialogContent, accessor);
+
+        handler.bindEvents = function() {
+            var self = this;
+
+            function bindSelectAssignmentEditorHandler() {
+                self.$dialogContent.find('li.not-selected').on('click', function() {
+                    self.accessor.switchAssignment($(this).prop('id'));
+                });
+            }
+
+            function bindDeleteAssignmentHandler() {
+                self.$dialogContent.find('a.delete-assignment').on('click', function(event) {
+                    event.stopPropagation();
+                    self.accessor.deleteAssignment($(this).closest('li.assignmentEditor').prop('id'));
+                });
+            }
+
+            function bindCreateAssignmentHandler() {
+                self.$dialogContent.find('button.create-Assignment').on('click', function() {
+                    self.accessor.createAssignment($(this).attr('userid'));
+                });
+            }
+
+            bindSelectAssignmentEditorHandler();
+            bindDeleteAssignmentHandler();
+            bindCreateAssignmentHandler();
+        };
+
+        return handler;
+    };
+
+    var $dialogContent = $('<div></div>').prop('id', 'assignment-switcher'),
+        accessor,
+        assignmentsHandler;
+
+    function show(assignmentId) {
+            accessor.getList(assignmentId, function(data) {
+                assignmentsHandler.handleList(data);
+            });
+    }
+
+    $(document).ready(function() {
+
+        var $switcherElement = $('.netd-assignment-switcher:visible'),
+            isEditor = $switcherElement.hasClass('in-user-editor');
+
+        accessor = isEditor
+            ? new UserEditorAssignmentAccessor()
+            : new AssignmentAccessor("ASSIGNMENTSWITCHER", {
+                    list: {
+                        "ACTION": "LIST"
+                    },
+                    switchAssignment: {
+                        "ACTION": "SWITCH"
+                    }
+                });
+        assignmentsHandler = isEditor
+            ? new UserEditorAssignmentListHandler($dialogContent, accessor)
+            : new AssignmentListHandler($dialogContent, accessor);
+        $dialogContent.dialog({
+                                  autoOpen: false,
+                                  modal: true,
+                                  width: 'auto',
+                                  resizable: false,
+                                  minHeight: 250,
+                                  title: $switcherElement.text()
+                              });
+
+        $switcherElement.on('click', function() {
+            if (parent.frames['fresco_main'] && parent.frames['fresco_main'].netd) {
+                parent.frames['fresco_main'].netd.component.assignmentSwitcher.showSwitcher();
+            } else {
+                show($(this).prop('id'));
+            }
+        });
+    });
+
+    return {
+        showSwitcher: show
+    }
+})();
+
+netd.component.datepicker = (function(){
+	var yearStart = 1930;
+	var yearEnd = 2099;
+	var TODAYSDISPLAYDATE;
+	var TODAYSMOMENT;
+	function getContainer($inputField){
+		return $inputField.closest(".date-container");
+	}
+
+	function showCalendarJsEvent($inputField){
+		var js=$inputField.attr('data-showCalendarJsEvent');
+		if(js != undefined){
+		    var showCalendarFunction = new Function(js);
+		    showCalendarFunction();
+		}
+	}
+
+	function resetDateJsEvent($inputField){
+		var allowClear = $inputField.attr('data-allowClear');
+		var js = $inputField.attr('data-resetDateJsEvent');
+		if(allowClear != undefined && js != undefined){
+		    var resetDateFunction = new Function(js);
+		    resetDateFunction();
+			if($inputField.attr('data-selectdaycallback') != undefined){
+				getFunctionByName($inputField.attr('data-selectdaycallback'), window).apply($inputField);
+			}
+		}
+	}
+
+	function toggleCalendarIcon($inputField){
+		var dateSelected = $inputField.val();
+		if(dateSelected != ""){
+			showRemoveSign($inputField);
+		}else{
+			showCalendarIcon($inputField);
+		}
+	}
+
+	function showRemoveSign($inputField){
+		var container = getContainer($inputField);
+		var iconSpan = container.find(".netd-icon");
+		var iconButton = iconSpan.parent();
+		var allowClear = $inputField.attr('data-allowClear');
+		if(allowClear != undefined){
+			iconSpan.removeClass("icon-calendar");
+			iconSpan.addClass("icon-remove-sign");
+			iconButton.attr("title", BUNDLE['label.delete_the_date']);
+		}
+	}
+
+	function showCalendarIcon($inputField){
+		var container = getContainer($inputField);
+		var iconSpan = container.find(".netd-icon");
+		var iconButton = iconSpan.parent();
+		iconSpan.removeClass("icon-remove-sign");
+		iconSpan.addClass("icon-calendar");
+		iconButton.attr("title", BUNDLE['title.select.a.date']);
+	}
+
+	function setHiddenDate($inputField, y, m, d){
+		var container = getContainer($inputField);
+		if(y instanceof Date){
+			var dateSelected=y;
+			y=dateSelected.getFullYear()
+			m=dateSelected.getMonth();
+			d=dateSelected.getDate();
+		}
+		container.children("input:hidden[name$=YEAR]")[0].value=y;
+		container.children("input:hidden[name$=MONTH]")[0].value=m;
+		container.children("input:hidden[name$=DAY]")[0].value=d;
+	}
+
+	function resetHiddenDate($inputField){
+		var container = getContainer($inputField);
+		container.children("input:hidden[name$=YEAR], input:hidden[name$=MONTH], input:hidden[name$=DAY]").val("-1");
+    	hideErrorLabel($inputField);
+   	}
+
+	function hideErrorLabel($inputField){
+		$inputField.removeAttr('aria-describedby');
+		var errorLabel = $inputField.parent().find('div.forDatepicker');
+		errorLabel.hide();
+		hideJQErrorLabel($inputField);
+	}
+
+	function hideJQErrorLabel($inputField){
+		var errorLabel = $inputField.parent().find('div').not('.forDatepicker');
+		errorLabel.hide();
+	}
+
+	function detectIE() {
+	    return conditionizr.ie11 | conditionizr.ie10 | conditionizr.ie9 | conditionizr.ie8 | conditionizr.ie7;
+	}
+
+	function showError($inputField, errorMessage){
+		var errorDiv = $inputField.parent().find('div.forDatepicker');
+		errorDiv.attr('tabindex', "-1");
+		errorDiv.attr('id', $inputField.attr('id')+"-error");
+		$inputField.addAriaDescribedby(errorDiv[0].id);
+		if (detectIE()){
+			accessibility.updateScreenReaderAlert(errorMessage);
+		}
+
+		var errorSpan = errorDiv.children().first();
+		errorSpan.html(errorMessage);
+		errorSpan.parent().show();
+		errorSpan.show();
+	}
+
+	function setDatepickerDate(dateSelected, $inputField){
+		setHiddenDate($inputField, dateSelected);
+		if($inputField.attr('data-selectdaycallback') != undefined){
+			getFunctionByName($inputField.attr('data-selectdaycallback'), window).apply($inputField);
+		}
+	}
+
+	function getFromHiddenDate($inputField){
+		var container = getContainer($inputField),
+			hiddenDay = container.children("input:hidden[name$=DAY]").val(),
+			hiddenMonth = parseInt(container.children("input:hidden[name$=MONTH]").val(),10) + 1,
+			hiddenYear = container.children("input:hidden[name$=YEAR]").val();
+		var hiddenDate = moment(hiddenDay +"/"+ hiddenMonth +"/"+ hiddenYear,'D/M/YYYY').format(MOMENTDISPLAYFORMAT);
+		return hiddenDate;
+	}
+
+	function isjQueryValidationEnabled($inputField){
+		return !!($($inputField[0].form).data('validator'));
+	}
+
+	function isYearWithinRange(momentSelected){
+		return (momentSelected.year() >= yearStart && momentSelected.year() <= yearEnd );
+	}
+
+	function validateDatepickerDate(dateSelected, $inputField){
+		var validationObject = getValidationObject($inputField);
+		if(validationObject.isValid){
+			var verifiedDate = validationObject.verifiedDate;
+			setDatepickerDate(verifiedDate, $inputField);
+			hideErrorLabel($inputField);
+		}else{
+			if(isjQueryValidationEnabled($inputField)) {
+				hideErrorLabel($inputField);
+				return;
+			}
+			if($inputField.prop("disabled")) {
+				hideErrorLabel($inputField);
+			}else{
+				showError($inputField, validationObject.message);
+			}
+		}
+	}
+
+	function getValidationObject(ele){
+		$ele = getEle(ele);
+		var dateSelected = $ele.val();
+		var validationObject = {'isValid' : true, 'message' : '', 'verfiedDate' : null};
+
+		if(dateSelected == ""){
+			return validationObject;
+		}
+
+		RegExp.escape = function(string){
+			return string.replace(/[.]/g,'\\$&');
+		}
+
+		var momentSelected = moment(dateSelected, MOMENTFORMAT, true);
+		var invalidFormatMsg = '<span class="screen-reader-only">' + BUNDLE['JAVASCRIPT_030_INVALIDDATE'] + ' </span>' + BUNDLE['error.validFormat'].replace('{0}', ': ' + LOCALIZEDFORMAT) + '<br/>(' + BUNDLE['label.eg'] + ' ' + TODAYSDISPLAYDATE + ')';
+		if(momentSelected.isValid()){
+			if(!isYearWithinRange(momentSelected)){
+				validationObject.message = BUNDLE['error.yearOutOfRange'].replace('{0}',yearStart).replace('{1}',yearEnd);
+				validationObject.isValid = false;
+			}else if(!checkFutureSelectOnly($ele, momentSelected)){
+				validationObject.message = BUNDLE['error.dateShouldBeInFuture'];
+				validationObject.isValid = false;
+			}
+			validationObject.verifiedDate = momentSelected.toDate();
+		}else{
+			validationObject.message = invalidFormatMsg;
+			validationObject.isValid = false;
+		}
+		return validationObject;
+	}
+
+	function isValid(ele){
+		return getValidationObject(ele).isValid;
+	}
+
+	function checkFutureSelectOnly($ele, momentSelected){
+		if(!!$ele.attr('data-futureselectonly')){
+			if(momentSelected.isSame(TODAYSMOMENT) || momentSelected.isAfter(TODAYSMOMENT)){
+				return true;
+			}else{
+				return false;
+			}
+		}else{
+			return true;
+		}
+	}
+
+	function setFromHiddenDate($inputField, isForce){
+		if(isForce || ($inputField.val() != "" && !isValid($inputField))){
+			var container = getContainer($inputField);
+			if(container.children("input:hidden[name$=YEAR]").val() > 0){
+				$inputField.val(getFromHiddenDate($inputField));
+			}else{
+				$inputField.val('');
+			}
+		}
+		toggleCalendarIcon($inputField);
+		hideErrorLabel($inputField);
+	}
+
+	function publicResetHiddenDate(ele){
+		var $inputField=getEle(ele);
+		resetHiddenDate($inputField);
+		$inputField.val('');
+		showCalendarIcon($inputField);
+		hideErrorLabel($inputField);
+	}
+
+	function setYMD($inputField, y, m, d){
+		setHiddenDate($inputField, y, m, d);
+		setFromHiddenDate($inputField, 'force');
+	}
+	function getYMD($inputField){
+		var container=getContainer($inputField);
+		return {y:container.children("input:hidden[name$=YEAR]").val()|0,
+				m:container.children("input:hidden[name$=MONTH]").val()|0,
+				d:container.children("input:hidden[name$=DAY]").val()|0,
+				valid:isValid($inputField),
+				txt:$inputField.val()};
+	}
+
+	function initOnce(){
+		$.datepicker.setDefaults($.datepicker.regional['']);
+
+		moment.updateLocale("en", {
+			weekdays : DATEFORMATSYMBOLWEEKOFDAYS.slice(1),
+			months : DATEFORMATSYMBOLMONTHS,
+			monthsShort : DATEFORMATSYMBOLSHORTMONTHS,
+			monthsParseExact : true
+		});
+
+		TODAYSDISPLAYDATE = moment().format(MOMENTDISPLAYFORMAT);
+		TODAYSMOMENT = moment().startOf('day');
+
+		initOnce=function(){};
+	}
+	function initAriaDescription(target){
+	    if(!$("#netd-datepicker-format-desc").length){
+	    	var formatDesc = '<span class="display-none" tabindex="-1" id="netd-datepicker-format-desc">'
+	    		+ BUNDLE['error.validFormat'].replace('{0}', ': ' + getReadableDateFormat(LOCALIZEDFORMAT))
+                + ' (' + BUNDLE['label.eg'] + ' ' + getReadableDateFormat(TODAYSDISPLAYDATE) + '). '
+	    	    + '</span>';
+	    	target.first().before(formatDesc);
+	    }
+	    target.attr("aria-describedby", "netd-datepicker-format-desc");
+	    target.attr("data-describedby", "netd-datepicker-format-desc");
+	}
+	function getReadableDateFormat(dateFormatStr) {
+		return dateFormatStr.replace(/\ /g, " " + BUNDLE['text.character.space'] + " ")
+            .replace(/,/g, " " + BUNDLE['text.character.comma'] + " ")
+            .replace(/\./g, " " + BUNDLE['text.character.dot'] + " ")
+            .replace(/-/g, " " + BUNDLE['text.character.hyphen'] + " ");
+	}
+	function init(target) {
+		target = target || document;
+		var element = $(".date-container .date-field-container > input", target).not(".hasDatepicker");
+		if(!element.length){
+			return;
+		}
+		initOnce();
+
+		initAriaDescription(element);
+
+    	element.datepicker({
+    		  dateFormat: DATEPICKERFORMAT,
+    		  monthNames : DATEFORMATSYMBOLMONTHS,
+    		  monthNamesShort : DATEFORMATSYMBOLSHORTMONTHS,
+    		  dayNames : DATEFORMATSYMBOLSHORTWEEKOFDAYS.slice(1,8),
+    		  dayNamesMin : DATEFORMATSYMBOLSHORTWEEKOFDAYS.slice(1,8),
+    		  minDate: new Date(yearStart,0,1),
+    		  maxDate: new Date(yearEnd,11,31),
+    		  yearRange: yearStart + ":" + yearEnd,
+    	      changeMonth: true,
+    	      changeYear: true,
+    	      shortYearCutoff: 68,
+    	      beforeShow: function(inputField, instance){
+    	    	  showCalendarJsEvent($(inputField));
+    	      },
+    		  onSelect : function(dateSelected, instance){
+    			  var o=$(this);
+    			  setDatepickerDate(o.datepicker('getDate'), o);
+    			  showRemoveSign(o);
+    			  hideErrorLabel(o);
+    		  },
+    		  showOn: "button"
+    	});
+
+    	element.each(function(index, singleElement){
+    		var o=$(singleElement),
+    			container=getContainer(o);
+    		if(o.attr('data-futureselectonly') != undefined){
+    			o.datepicker("option", "minDate", "0");
+    		}
+    		if("defaultValue" in singleElement){
+    			$(singleElement.form).on("reset.netddatepicker", function(e){
+    				setTimeout(function(){
+    					o.triggerHandler("change.netddatepicker");
+    				}, 1);
+    			});
+    		};
+    		container.find("span.netd-icon").parent().on("click.netddatepicker", function(e){
+    			if(o.prop('disabled')){
+    				e.stopPropagation();
+    			} else{
+	    			if(container.find("span.icon-remove-sign").length > 0){
+	    				publicResetHiddenDate(o);
+	    				resetDateJsEvent(o);
+	    			} else if(container.find("span.icon-calendar").length > 0){
+	       				o.datepicker('show');
+	    			}
+    			}
+    		});
+    		o.on("focusin.netdatepicker", function(e){
+
+    			if ($(this).data('describedby')) {
+    				var ariaLabel = $(this).attr('aria-describedby');
+    				if (ariaLabel && ariaLabel != ''){
+    					if (ariaLabel.indexOf($(this).data('describedby')) < 0){
+    						$(this).attr('aria-describedby',  ariaLabel+' '+$(this).data('describedby'));
+    					}
+    				} else {
+    					$(this).attr('aria-describedby',  $(this).data('describedby'));
+    				}
+    			}
+    		});
+    		o.on("netdStateChange change.netddatepicker",function(e){
+    			var dateSelected = this.value,
+    				o=$(this);
+    			showCalendarJsEvent(o);
+    			if(dateSelected != ""){
+    				validateDatepickerDate(dateSelected, o);
+    			}else{
+    				publicResetHiddenDate(o);
+    			}
+    			toggleCalendarIcon(o);
+    		});
+    		o.on("click.netddatepicker", function(e) {
+    			if(!o.prop('disabled')){
+    				o.datepicker('show');
+    			}
+    		});
+    	});
+	}
+	function getEle(ele){
+		if(typeof ele === "string"){
+			ele = $("input.hasDatepicker[name="+ele+"],input.hasDatepicker[name="+ele+"datebox]");
+		}else if(!ele.jquery){
+			ele=$(ele);
+		}
+		return ele;
+	}
+	function isBlank(ele){
+		var v= getYMD(getEle(ele));
+		return v.y==-1 && v.txt=="";
+	}
+	function alertIfNotValid(ele, fieldName, joinWith){
+		if(!isValid(ele)){
+			if(!fieldName){
+				alert(BUNDLE['msg.invalid.date.verify']);
+				return false;
+			}
+			if(typeof joinWith == "undefined"){
+				joinWith = " : ";
+			}
+			alert(fieldName + joinWith + BUNDLE['JAVASCRIPT_030_INVALIDDATE']);
+			return false;
+		}
+		return true;
+	}
+	function publicSetFromHiddenDate(ele){
+		return setFromHiddenDate(getEle(ele));
+	}
+	function publicGetYMD(ele){
+		return getYMD(getEle(ele));
+	}
+	function publicSetYMD(ele, y, m, d){
+		return setYMD(getEle(ele), y, m, d);
+	}
+
+	function publicDisable(ele){
+		getEle(ele).prop("disabled",true);
+	}
+
+	function publicEnable(ele){
+		getEle(ele).prop("disabled",false);
+	}
+
+	function setAllInvalidFromHidden(form){
+		var dates="elements" in form ? $(form.elements).filter(".hasDatepicker") : $(form).find(".hasDatepicker");
+		for (var i = 0, l = dates.length; i < l; i++) {
+			var o=dates[i];
+			if (!netd.component.datepicker.isValid(o)) {
+				netd.component.datepicker.setFromHiddenDate(o);
+			}
+		}
+	}
+	return {
+		init: init,
+		// utility
+		setAllInvalidFromHidden: setAllInvalidFromHidden,
+		// below API, either take "prefix", "name", or DOMElement, or jQuery of the input
+		isValid: isValid,
+		isBlank: isBlank,
+		alertIfNotValid: alertIfNotValid,
+		resetHiddenDate : publicResetHiddenDate, // clear the value
+		setFromHiddenDate : publicSetFromHiddenDate, // update the label as hidden field value
+		getYMD: publicGetYMD, // return {y:y, m:m, d:d}
+		setYMD: publicSetYMD,
+		enable : publicEnable,
+		disable : publicDisable,
+		getEle: getEle,
+		getValidationObject : getValidationObject,
+		showError : showError,
+		hideErrorLabel : hideErrorLabel
+	}
+})();
+
+netd.component.initAll = function (target) {
+	target = target || document;
+	netd.component.initComponentButtons(target);
+	netd.component.initComponentTables();
+	netd.component.initComponentCheckAllCheckBoxes();
+	netd.component.initComponentCheckBoxes();
+    netd.component.dropdown.init();
+    netd.component.accordion.init();
+    netd.component.initComponentHoverLinks();
+    netd.component.initComponentTextInputs();
+    netd.component.initComponentCompetencySelector();
+    netd.component.initComponentUserSelector(target);
+    netd.component.initComponentFilterForm();
+	netd.component.initComponentTree();
+	netd.component.initComponentBoxInputs();
+	netd.component.toolTip.init();
+	netd.component.imagePreviewer.init();
+	netd.component.backToTop.init();
+	netd.component.initComponentActionPanel(target);
+	netd.component.datepicker.init(target);
+	netd.component.initSelectOptions(target);
+
+	if (typeof netd.component.initCallback == 'function') {
+		netd.component.initCallback(target);
+	}
+	// onInitComplete should be called last!
+	netd.component.onInitComplete();
+	netd.component.onInitComplete = function () {
+	}; // clear onInitComplete after every call
+};
+
+netd.component.onInitComplete = function () {
+};
+
+netd.component.initOnce = function () {
+	function initBrowserPrintHandler() {
+		$(document).on("click", ".netd-browser-print", function __handleBrowserPrint(e) {
+			e.preventDefault();
+			$(this).previewThenPrint();
+		});
+	}
+
+	initBrowserPrintHandler();
+	netd.component.initQuickNavigation();
+	netd.component.filterGroup.initOnce();
+	netd.component.multiSelectDropdown.initOnce();
+	netd.component.dropDownButton.initOnce();
+	netd.component.accordion.initOnce();
+	netd.component.dropdown.initOnce();
+	netd.component.backToTop.initOnce();
+}
+
+$.fn.previewThenPrint = function (title) {
+
+	if (!title) {
+		title = $(this).attr("title") ? $(this).attr("title") : $(this).attr("value");
+	}
+
+	var doctype = document.doctype;
+	var docTypeHtml;
+	/* If DOCTYPE is not accessible (IE8 and earlier version), use hand-code. */
+	if (doctype == null) {
+		docTypeHtml = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">';
+	} else {
+		docTypeHtml =
+			'<!DOCTYPE '
+			+ doctype.name
+			+ (doctype.publicId ? ' PUBLIC "' + doctype.publicId + '"' : '')
+			+ (!doctype.publicId && doctype.systemId ? ' SYSTEM' : '')
+			+ (doctype.systemId ? ' "' + doctype.systemId + '"' : '')
+			+ '>';
+	}
+	var styleSheets = document.styleSheets;
+	var body = document.body;
+	var bodyInnerHTML = body.innerHTML;
+	var bodyClassName = body.className;
+	var previewTab = window.open('', '_blank');
+	previewTab.document.open();
+	previewTab.document.write(docTypeHtml);
+	previewTab.document.write('<html><head><title>' + title + '</title>');
+	for (var i = 0; i < styleSheets.length; i++) {
+		previewTab.document.write('<link href="' + styleSheets[i].href + '" type="text/css" rel="stylesheet">');
+	}
+	previewTab.document.write('<script>function printSoon() { setTimeout(function(){ window.print(); }, 500); }</script>');
+	previewTab.document.write('</head><body onload="printSoon()" class="print-preview-mode ');
+	previewTab.document.write(bodyClassName);
+	previewTab.document.write('">' +
+		'<div class="print-preview-container">' +
+		'<div id="print-preview-mask"></div>' +
+		'<div id="print-preview-action">' +
+		'<button class="netd-button" onclick="window.print();" type="button" >' + title + '</button>' +
+		'</div>' +
+		'<div class="print-preview">');
+	previewTab.document.write(bodyInnerHTML);
+	previewTab.document.write('</div></div></body></html>');
+	previewTab.document.close();
+};
+
+// Reference from: http://stackoverflow.com/questions/1582534/calculating-text-width-with-jquery
+$.fn.textWidth = function () {
+	var html_org = $(this).html();
+	var html_calc = '<span>' + html_org + '</span>';
+	$(this).html(html_calc);
+	var width = $(this).find('span:first').width();
+	$(this).html(html_org);
+	return width;
+};
+
+$.fn.serializeJSON = function(serializeArray) {
+	var json = {};
+	if (serializeArray) {
+		jQuery.map($(this).serializeArray(), function(n, i) {
+	        if (json[n['name']] !== undefined) {
+	            if (!json[n['name']].push) {
+	            	json[n['name']] = [json[n['name']]];
+	            }
+	            json[n['name']].push(n['value'] || '');
+	        } else {
+	        	json[n['name']] = n['value'] || '';
+	        }
+	    });
+	} else {
+		jQuery.map($(this).serializeArray(), function(n, i) {
+			json[n['name']] = n['value'];
+		});
+	}
+	return json;
+};
+
+$.fn.resetAriaDescribedby = function() {
+	$(this).removeAttr('aria-describedby');
+}
+
+$.fn.addAriaDescribedby = function(errorid) {
+	$(this).attr('aria-describedby', errorid);
+}
+
+//check if this array is disjoint with another array
+Array.prototype.isDisjointWith = function (list2) {
+	var list1 = this.concat();
+
+	if (list1.length == 1 && list2.length == 1) {
+		if (list1[0] == "" && list2[0] == "") {
+			return true;
+		}
+	}
+
+	for (var i = 0; i < list1.length; i++) {
+		for (var j = 0; j < list2.length; j++) {
+			if (list1[i] == list2[j]) {
+				return false;
+			}
+		}
+	}
+	return true;
+};
+Array.prototype.remove = function(val) {
+    for (var i = 0; i < this.length; i++) {
+        if (this[i] == val) {
+            return this.slice(0, i).concat(this.slice(i+1));
+        }
+    }
+    return this;
+};
+Array.prototype.removeAll = function(values) {
+	var self = this;
+    for (var i = 0; i < values.length; i++) {
+    	self = self.remove(values[i]);
+    }
+    return self;
+};
+if (!String.prototype.endsWith) {
+	String.prototype.endsWith = function(searchString, position) {
+		var subjectString = this.toString();
+		if (position === undefined || position > subjectString.length) {
+			position = subjectString.length;
+		}
+		position -= searchString.length;
+		var lastIndex = subjectString.indexOf(searchString, position);
+		return lastIndex !== -1 && lastIndex === position;
+	};
+}
+
+
+$(function () {
+	netd.component.initAll(document);
+	netd.component.initOnce();
+});
+
+$(document).ajaxComplete(function(){
+	netd.component.initAll(document);
+});
+}
+
+netd.component.initSelectOptions = function(target){
+
+	$('.netd-dropdown-selector', target).each(function () {
+
+		$(this).on('mouseover focus', function (e) {
+			netd.component.populateSelectOptions($(this));
+		});
+	})
+};
+
+netd.component.populateSelectOptions = function(target){
+
+	var isInited = getComponentAttribute($(target), 'isinited');
+	if(isInited != null && isInited != 'true'){
+		var optionsJson = getComponentAttribute($(target), 'options');
+		var optionsHtml = [];
+		var currentSelectedVal = $(target).val();
+		$(target).empty();
+		$.each(JSON.parse(optionsJson), function (index, item) {
+
+			optionsHtml.push("<option value='" + item.value + "'>" + item.name + "</option>");
+		});
+
+		$(target).append(optionsHtml.join(""));
+		$(target).attr('data-isInited', 'true');
+		$(target).val(currentSelectedVal);
+	}
+};

@@ -1,0 +1,53 @@
+function reloadWindow(isPopup) {
+	if (isPopup) {
+		if (window.top.opener) {
+			if (window.top.opener.parent.frames[2]) {
+				reload(window.top.opener.parent.frames[2]);
+				return;
+			} else if (window.top.opener.parent.frames[1]) {
+				reload(window.top.opener.parent.frames[1]);
+				return;
+			}
+			reload(window.top.opener.parent);
+		}
+	} else {
+		window.refresh();
+	}
+}
+
+function reload(obj) {
+	var beforeReloadFunction = obj.beforeReloadPage;
+	if (beforeReloadFunction) {
+		beforeReloadFunction();
+	} 
+	obj.location.reload();
+}
+
+function kcNamespace(){
+	return window.top.opener && window.top.opener.parent && window.top.opener.parent.kc;	
+}
+
+function reloadOverlay() {
+	kcNamespace().refreshTopOverlay();
+}
+
+function reloadTopKc() {
+	var ns = kcNamespace();
+	if (ns && ns.instance) {
+		reloadOverlay();
+	}
+}
+
+function initInteractionsWithOpener(){
+	reloadTopKc();
+	course.commons.openedWin.requestMonitorWindowCloseForMarkComplete();
+	if(window.opener) {
+		if(window.opener.opener) {
+			if(window.opener.opener.parent.frames[2]){
+				window.opener.opener.parent.frames[2].location.reload();
+			}else{
+				window.opener.opener.location.reload();
+			}
+		}
+	}
+}

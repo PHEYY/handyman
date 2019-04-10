@@ -1,0 +1,36 @@
+/*
+ *
+ * Copyright (c) 1999-2013 NetDimensions Ltd.
+ *
+ * All rights reserved.
+ *
+ * This software is the confidential and proprietary information of
+ * NetDimensions Ltd. ("Confidential Information").  You shall not
+ * disclose such Confidential Information and shall use it only in
+ * accordance with the terms of the license agreement you entered into
+ * with NetDimensions.
+ */
+(function (namespace) {
+
+	var paramsForMarkComplete = null;
+
+	// using opener's namespace as the context for monitoring
+	function courseCommonsNamespace(){
+		return window.top.opener && window.top.opener.course && window.top.opener.course.commons;
+	}
+	
+	namespace.requestMonitorWindowCloseForMarkComplete = function() {
+		try{
+			paramsForMarkComplete = paramsForMarkComplete || courseCommonsNamespace().getParamsForMarkComplete();
+			// periodically req. monitoring to avoid opener lost the window ref. after refresh
+			setInterval(function(){
+				var ns = courseCommonsNamespace();
+				if (ns && ns.getParamsForMarkComplete) {
+					paramsForMarkComplete = ns.getParamsForMarkComplete() || paramsForMarkComplete;
+					ns.startMonitorWindowCloseForFurtherActions(window.top, paramsForMarkComplete);
+				}
+			}, 500);
+		}catch(e){}//catch securityerror to ignore this script when open popup window cross-domain,PD-4721 
+	};
+
+})(course.commons.openedWin);

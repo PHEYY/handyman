@@ -1,0 +1,47 @@
+ul.messagebar {
+    display: block;
+    top: 0;
+    left: -1px;
+    z-index: 399999;
+    text-align: center;
+    box-shadow: 0 1px 5px #aaa;
+}
+
+ul.warning.messagebar, ul.error.messagebar, ul.success.messagebar {
+    width: 100%;
+    height: auto;
+    margin: -1px 0 0 0;
+    padding: 30px 0 20px 0;
+    list-style: none;
+}
+
+.messagebar li {
+    clear: both;
+    width: 90%;
+    margin: 0 0 3px 5%;
+    padding: 0;
+    line-height: 1.5;
+    font-size: 1.077em;
+    font-weight: bold;
+    white-space: normal;
+}
+
+.messagebar a {
+    display: block;
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 5%;
+    padding: 30px 0 20px 0;
+    color: #333333;
+    margin: 0 5px;
+    visibility: hidden;
+}
+
+.messagebar a, .messagebar a:hover, .messagebar a:focus {
+    font-size: 1.231em;
+}
+
+.messagebar a span {
+    visibility: visible;
+}

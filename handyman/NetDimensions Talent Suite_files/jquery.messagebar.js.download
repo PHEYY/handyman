@@ -1,0 +1,191 @@
+/*
+ *
+ * Copyright (c) 1999-2012 NetDimensions Ltd.
+ *
+ * All rights reserved.
+ *
+ * This software is the confidential and proprietary information of
+ * NetDimensions Ltd. ("Confidential Information").  You shall not
+ * disclose such Confidential Information and shall use it only in
+ * accordance with the terms of the license agreement you entered into
+ * with NetDimensions.
+ * 
+ */
+(function($) {
+
+	var messageTimer;
+
+	var messageUL = $('<ul></ul>');
+
+	function showMessage(messageObj, isMessageULVisible, settings) {
+		// Add a close icon, animate and show the message bar at the top of the
+		// screen
+		var btnDesc = BUNDLE['button.Close'];
+		$(messageObj).append("<a title='"+btnDesc+"'><span class='netd-icon icon-remove'></span>"+btnDesc+"</a>");
+		$(messageObj).show();
+		if (!isMessageULVisible) {
+			$(messageObj).animate({
+				top : '-=10'
+			}, 300, null);
+		}
+		$(messageObj).css("position", "fixed");
+
+		// Bind click event to close the message bar
+		$(messageObj).find("a").click(function() {
+			hideMessage($(messageObj), settings.callback);
+		});
+
+		// Handles mouse enters to stop automatic timer & restart timer when
+		// mouse leaves
+		$(messageObj).mouseenter(function() {
+			clearMessageTimer($(messageObj));
+		}).mouseleave(function() {
+			setMessageTimer($(messageObj), settings);
+		});
+
+		// Sets the timer for the message
+		setMessageTimer($(messageObj), settings);
+	}
+
+	function setMessageTimer(messageObj, settings) {
+		clearMessageTimer();
+		messageTimer = setTimeout(function() {
+			hideMessage($(messageObj), settings.callback);
+		}, settings.duration);
+	}
+
+	function clearMessageTimer() {
+		if (messageTimer) {
+			clearTimeout(messageTimer);
+		}
+	}
+
+	function hideMessage(messageObj, callback) {
+		clearMessageTimer();
+		$(messageObj).animate({
+			top : '+=10'
+		}, 300, function() {
+			$(messageObj).css("position", "absolute");
+		});
+		$(messageObj).empty();
+		messageUL.remove();
+		if (typeof callback == "function") {
+			callback();
+		}
+	}
+
+	function clearContentAndSetClass(messageObj, className) {
+		$(messageObj).empty();
+		$(messageObj).attr("class", className + " messagebar");
+	}
+
+	function configureZIndex(messageObj, z_index) {
+		if(z_index){
+			messageObj.css('z-index', parseInt(z_index));
+		}		
+	}
+	
+	function getMessageAppendTarget(obj) {
+		var parentBody = obj.parent('body');
+		if (parentBody.length > 0) {
+			return parentBody;
+		}
+		return obj;
+	}
+
+	var globalDefaults = {
+			'z_index': null,
+			'callback' : null,
+			'duration': 5000
+		};
+	
+	var methods = {
+
+		showSuccess : function(options) {
+			var defaults = $.extend(globalDefaults, {'message' : BUNDLE['msg.yourChangesHaveBeenSaved']});
+			var settings = $.extend(defaults, options);
+			
+			if (getEnableAccessibility()){
+				
+				alert(settings.message);
+				
+			} else {
+
+				clearContentAndSetClass(messageUL, "success");
+
+				configureZIndex(messageUL, settings.z_index);
+
+				accessibility.updateScreenReaderAlert(settings.message);
+				messageUL.append('<li aria-hidden="true" tabindex="-1">' + settings.message + '</li>');
+
+				var isMessageULVisible = $(messageUL).is(":visible");
+				getMessageAppendTarget($(this)).append(messageUL);
+				showMessage(messageUL, isMessageULVisible, settings);
+				
+			}
+		},
+
+		showWarning : function(options) {
+			
+			var defaults = $.extend(globalDefaults, {'messages' : [ BUNDLE['msg.errorSavingYourChanges'] ]});
+			var settings = $.extend(defaults, options);
+			
+			if (getEnableAccessibility()){
+				
+				var msg = "";
+				if (settings.messages instanceof Array) {
+					for ( var i = 0; i < settings.messages.length; i++) {
+						msg+=settings.messages[i]+"\n";
+					}
+				} else {
+					msg = settings.messages
+				}
+				alert(msg);
+				
+			} else {
+	
+				clearContentAndSetClass(messageUL, "warning");
+	
+				configureZIndex(messageUL, settings.z_index);
+	
+				if (settings.messages instanceof Array) {
+					for ( var i = 0; i < settings.messages.length; i++) {
+						accessibility.updateScreenReaderAlert(settings.messages[i]);
+						messageUL.append('<li aria-hidden="true" tabindex="-1">' + settings.messages[i] + '</li>');
+					}
+				} else {
+					accessibility.updateScreenReaderAlert(settings.messages);
+					messageUL.append('<li aria-hidden="true" tabindex="-1">' + settings.messages + '</li>');
+				}
+				var isMessageULVisible = $(messageUL).is(":visible");
+				getMessageAppendTarget($(this)).append(messageUL);
+				showMessage(messageUL, isMessageULVisible, settings);
+			}
+		}
+	};
+
+	$.fn.messagebar = function(method) {
+
+		if (methods[method]) {
+			return methods[method].apply(this, Array.prototype.slice.call(arguments, 1));
+		} else if (typeof method === 'object' || !method) {
+			return methods.init.apply(this, arguments);
+		} else {
+			$.error('Method ' + method + ' does not exist in jquery.messagebar');
+		}
+
+	};
+
+})(jQuery);
+
+function jError(message) {
+	jWarning(message);
+}
+
+function jWarning(message) {
+	$("#main-document-div").messagebar('showWarning',{ 'messages': message});
+}
+
+function jSuccess(message){
+	$("#main-document-div").messagebar('showSuccess',{ 'message': message});
+}

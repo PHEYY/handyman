@@ -1,0 +1,22 @@
+/*
+ *
+ * Copyright (c) 1999-2015 NetDimensions Ltd.
+ *
+ * All rights reserved.
+ *
+ * This software is the confidential and proprietary information of
+ * NetDimensions Ltd. ("Confidential Information").  You shall not
+ * disclose such Confidential Information and shall use it only in
+ * accordance with the terms of the license agreement you entered into
+ * with NetDimensions.
+ */
+(function(namespace) {
+
+
+    namespace.reviewExam = function() {
+
+        var url = $(this).attr('data-href');
+        window.location = url;
+    }
+
+})(exam.showResult);

@@ -1,0 +1,46 @@
+/*
+ *
+ * Copyright (c) 1999-2012 NetDimensions Ltd.
+ *
+ * All rights reserved.
+ *
+ * This software is the confidential and proprietary information of NetDimensions Ltd. ("Confidential Information"). You
+ * shall not disclose such Confidential Information and shall use it only in accordance with the terms of the license
+ * agreement you entered into with NetDimensions.
+ */
+
+(function( $ ) {
+	
+	$.fn.alternateRows = function(rowGroupAttr) {
+		var rows = this.is("table") ? this.children("tbody").children("tr") : this.children("div");
+		if(rowGroupAttr){
+			var prevGroup = rows.first().attr(rowGroupAttr);
+			var mergedRowNum = 0;
+			rows.each(function(rowNum, item) {
+				var row = $(item);
+				var group = row.attr(rowGroupAttr);
+				if(group !== prevGroup){
+					mergedRowNum++;
+					prevGroup = group;
+				}
+				var classname = (mergedRowNum % 2 === 0) ? "row1" : "row2";
+				row.removeClass("row1 row2").addClass(classname);
+			});
+		}else{
+			var rowNum = 0;
+			rows.each(function() {
+				$(this).removeClass("row1 row2").addClass((rowNum % 2 === 0) ? "row1" : "row2");
+				rowNum++;
+			}); 
+		}
+	};
+
+	$.fn.alternateCols = function() {
+		var cells = this.find("tbody tr td");
+		cells.removeClass("row1 row2");
+		this.find("tbody tr td:nth-child(odd)").addClass("row2");
+		this.find("tbody tr td:nth-child(even)").addClass("row1");
+	};
+	
+})( $ );
+

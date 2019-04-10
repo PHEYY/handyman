@@ -1,0 +1,37 @@
+/*
+ *
+ * Copyright (c) 1999-2016 NetDimensions Ltd.
+ *
+ * All rights reserved.
+ *
+ * This software is the confidential and proprietary information of
+ * NetDimensions Ltd. ("Confidential Information").  You shall not
+ * disclose such Confidential Information and shall use it only in
+ * accordance with the terms of the license agreement you entered into
+ * with NetDimensions.
+ */
+
+(function(namespace){
+
+	namespace.updateScreenReaderAlert = function(message) {
+		var alertDiv = $('#screenReaderAlertDiv');
+		if (alertDiv) {
+			var div = $('<div>').append(message);
+			alertDiv.append(div);
+			setTimeout(function() {
+				div.remove();
+			}, 5000);
+		}
+	};
+
+	$(document).ready(function() {
+		// To include the invisible screen reader alert div in your page, either add
+		// this javascript file explicitly or use the JQuery.accessibility() method.
+		// Before doing that, please inspect the DOM of your page to see whether you
+		// actually need to (several of the base view classes already add it).
+		if (!$('#screenReaderAlertDiv').length) {
+		    $('body').append($('<div>', { 'id':'screenReaderAlertDiv', 'class':'screen-reader-only', 'aria-live':'assertive', 'aria-relevant':'additions'}));
+		}
+	});
+
+})(accessibility);
